@@ -209,6 +209,7 @@ class DemoProvider:
     name = "demo"
     model = "meeting-fixtures"
     sample_dir = Path(__file__).resolve().parents[2] / "samples"
+    sample_names = ("meeting1_2026-11-18.txt", "meeting2_2026-11-20.vtt")
 
     def generate_structured(
         self,
@@ -247,7 +248,7 @@ class DemoProvider:
         )
 
     def extraction(self, data: dict) -> dict:
-        for filename in ("meeting1_2026-11-18.txt", "meeting2_2026-11-20.vtt"):
+        for filename in self.sample_names:
             source = (self.sample_dir / filename).read_text(encoding="utf-8")
             fixture = parse(source, filename.rsplit(".", 1)[1], 100)
             spoken = [(row.speaker_label, row.text) for row in fixture]

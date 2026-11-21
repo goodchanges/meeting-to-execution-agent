@@ -6,6 +6,7 @@ from time import monotonic, sleep
 from typing import Annotated, TypeVar
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -15,6 +16,7 @@ from .ai import (
     COMPARE,
     EXTRACT,
     Comparison,
+    DemoProvider,
     Extraction,
     ProviderError,
     Usage,
@@ -41,6 +43,20 @@ FORMATS = {
         "application/octet-stream",
     },
 }
+
+
+@protected.get("/meetings/demo-samples/{filename}")
+def download_sample(filename: str, request: Request):
+    if (
+        request.app.state.settings.ai_mode != "demo"
+        or filename not in DemoProvider.sample_names
+    ):
+        raise HTTPException(404, "Sample transcript not found.")
+    return FileResponse(
+        DemoProvider.sample_dir / filename,
+        filename=filename,
+        media_type="text/plain",
+    )
 
 
 @protected.post("/meetings", status_code=201)

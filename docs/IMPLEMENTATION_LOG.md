@@ -55,3 +55,9 @@ Upgraded ESLint to 10.15.0 and its recommended configuration package to 10.0.1. 
 Passed 70 backend tests with warnings treated as errors, the separately rerun two-meeting test, Ruff, mypy and 24/24 offline evaluations. A clean frontend install, ESLint, TypeScript, 2 Vitest tests and the production frontend build passed. Edge passed the two-meeting fixture walkthrough again on a fresh database. pip-audit reported no known vulnerabilities in the runtime and development requirements, and npm audit reported zero. Gitleaks found no findings in the full local Git history or the final source snapshot.
 
 The existing `.env` remained byte-for-byte unchanged, ignored and untracked. The local application and fresh-checkout example both use demo mode. Live generation, GitHub posting, external notifications, Docker startup and hosted deployment were NOT RUN.
+
+## 2026-11-21 — Website prototype
+
+Added a public homepage with an example decision timeline and direct registration and sign-in links. Restyled the authenticated workspace and account screens. Signed-in demo users can download the two existing transcripts from the upload page. The API serves only the two fixtures and requires an active session and demo mode.
+
+Passed 71 pytest cases, Ruff, mypy, 24/24 offline evaluations, frontend lint, typecheck, two frontend tests and the production frontend build. A fresh-database Edge run verified the public homepage, mobile layout, private-route redirect, signup, both downloads and meeting workflows, and the disabled GitHub confirmation. Documented a Render hosting option. External deployment and live generation were NOT RUN during this pass.

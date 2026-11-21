@@ -9,3 +9,11 @@ For a local development container, read a synthetic signup link with `docker com
 Terminate TLS at the host or reverse proxy. Attach the chosen domain, set the hosting provider's requested DNS records, and wait for certificate issuance. Set `PUBLIC_URL` to the exact HTTPS origin, configure the proxy source IP in `TRUSTED_PROXIES`, and ensure the proxy overwrites `X-Forwarded-Proto`. Keep app ports private. Staging and production enable secure cookies and HSTS. Add explicit CORS origins only for separate authorized clients.
 
 Check `/healthz`, `/readyz`, login, recent decisions, a signup verification email and a reset email and approval-to-GitHub flow before inviting users. Hosting, TLS, Docker startup and SMTP remain unverified.
+
+## Render prototype
+
+Use one paid Docker web service with the repository root as the build context and `deploy/Dockerfile` as the Dockerfile path. Mount a persistent disk at `/data` and use `/readyz` for the health check. The first rollout can use the service's HTTPS subdomain. [Render web services](https://render.com/docs/web-services) · [Persistent disks](https://render.com/docs/disks)
+
+- Set `APP_ENV=staging`, `PUBLIC_URL` to the HTTPS service origin, and a strong `SECRET_KEY` in the host's environment. Verify the ingress peer and its forwarded protocol behavior before configuring `TRUSTED_PROXIES`. Check that the homepage loads over HTTPS without a redirect loop and that signup sets secure cookies.
+- Configure the signup and reset mail sender through SMTP with STARTTLS. Confirm receipt of both messages using a test mailbox. Render's free web services block port 587. [Render's SMTP restrictions](https://render.com/docs/free)
+- Start in demo mode for the hosted infrastructure check. After the approved synthetic Gemini smoke test passes, supply `GEMINI_API_KEY` through the host's secret settings, set `AI_PROVIDER=gemini` and `AI_MODE=live`, and verify the hosted application with synthetic input before accepting real transcripts. Set the app's monthly AI call caps and provider billing limits for the intended rollout.

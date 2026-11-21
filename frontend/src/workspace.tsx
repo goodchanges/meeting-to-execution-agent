@@ -12,9 +12,9 @@ export function Dashboard({ account }: { account: Account }) {
   const tasks = useData<Task[]>('/action-items')
   const relations = useData<Relation[]>('/relations')
   return <>
-    <div className="hero"><span className="hero-kicker">WORKSPACE OVERVIEW</span>
+    <div className="hero">
       <h1>Good to see you,<br />{account.display_name}.</h1>
-      <p>From decisions to execution.</p>
+      <p>Review recent decisions or add a transcript to keep the work moving.</p>
       <Link className="button primary" to="/upload"><UploadCloud size={18} /> Upload transcript</Link>
     </div>
     <div className="metrics">

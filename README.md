@@ -17,11 +17,11 @@ uv run uvicorn backend.app.main:app --no-access-log --no-proxy-headers
 
 On macOS or Linux, use `test -f .env || cp .env.example .env` for the first line and use `npm` in place of `npm.cmd`.
 
-Open [MeetFlow](http://localhost:8000) and request a registration link. In development, open the link from the new file in the ignored `dev-outbox/` directory, then choose a display name and password. Existing users can sign in directly. FastAPI serves the built UI. For hot reload run `npm.cmd --prefix frontend run dev` in a second terminal and add `http://127.0.0.1:5173` to `CORS_ORIGINS` for origin validation.
+Open [MeetFlow](http://localhost:8000) and select **Create a workspace**. In development, open the registration link from the new file in the ignored `dev-outbox/` directory, then choose a display name and password. Existing users can sign in directly. FastAPI serves the built UI. For hot reload run `npm.cmd --prefix frontend run dev` in a second terminal and add `http://127.0.0.1:5173` to `CORS_ORIGINS` for origin validation.
 
 ## Run the demo
 
-Set `AI_MODE=demo` in `.env` before startup. Upload the [two supplied transcripts](samples/) in order. Fixture output is labeled **DEMO MODE — not live AI**. Local signup uses the development outbox and the demo requires no API keys. See the [demo walkthrough](docs/DEMO_WALKTHROUGH.md) for an isolated database, the reminder window, and the GitHub confirmation preview.
+Set `AI_MODE=demo` in `.env` before startup. Download the [two supplied transcripts](samples/) from **Upload transcript** and process them in order. Fixture output is labeled **DEMO MODE — not live AI**. Local signup uses the development outbox and the demo requires no API keys. See the [demo walkthrough](docs/DEMO_WALKTHROUGH.md) for an isolated database, the reminder window, and the GitHub confirmation preview.
 
 | Settings | Purpose |
 |---|---|

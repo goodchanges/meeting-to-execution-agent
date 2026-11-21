@@ -33,6 +33,24 @@ def approve(client, where, row):
     assert response.status_code == 200, response.text
 
 
+def test_sample_downloads_only_expose_demo_transcripts(setup):
+    app, client, _ = setup
+    endpoint = "/api/meetings/demo-samples/"
+    filenames = ("meeting1_2026-11-18.txt", "meeting2_2026-11-20.vtt")
+    assert client.get(endpoint + filenames[0]).status_code == 401
+    assert register(client).status_code == 201
+    for filename in filenames:
+        response = client.get(endpoint + filename)
+        assert response.content == (Path("samples") / filename).read_bytes()
+        assert (
+            response.headers["content-disposition"]
+            == f'attachment; filename="{filename}"'
+        )
+    assert client.get(endpoint + "unrelated.txt").status_code == 404
+    app.state.settings.ai_mode = "live"
+    assert client.get(endpoint + filenames[0]).status_code == 404
+
+
 def test_two_meeting_scenario(setup):
     app, client, _ = setup
     # Fixture-backed LLM provider and mocked GitHub HTTP.

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router'
 import { ArrowLeft, FileText, UploadCloud } from 'lucide-react'
-import { ApiError, type Detail, type Meeting, useAction, useData } from './api'
+import { ApiError, type Detail, type Meeting, type Mode, useAction, useData } from './api'
 import { Badge, Controls, dateLabel, Empty, Load, ModeLabel, onSubmit, PageHead, Problem, TextLink } from './ui'
 
 export function MeetingList() {
@@ -16,7 +16,7 @@ export function MeetingList() {
     </div> : <Empty title="No meetings yet"><TextLink to="/upload">Upload a transcript</TextLink></Empty>}</Load>
   </>
 }
-export function Upload() {
+export function Upload({ mode }: { mode: Mode }) {
   const [method, setMethod] = useState<'file' | 'paste'>('file')
   const [duplicate, setDuplicate] = useState<FormData | null>(null)
   const action = useAction()
@@ -34,6 +34,14 @@ export function Upload() {
   return <>
     <Link className="text-link back" to="/meetings"><ArrowLeft size={16} /> Meetings</Link>
     <PageHead title="Upload a transcript" subtitle="Preserve speaker names and cue timestamps for review." />
+    {mode === 'demo' && <section className="panel inset sample-downloads" aria-labelledby="samples-heading">
+      <h2 id="samples-heading">Demo transcripts</h2>
+      <p>Download both samples and process the kickoff first.</p>
+      <div className="buttons">
+        <a className="button" href="/api/meetings/demo-samples/meeting1_2026-11-18.txt">Launch kickoff (TXT)</a>
+        <a className="button" href="/api/meetings/demo-samples/meeting2_2026-11-20.vtt">Launch follow-up (VTT)</a>
+      </div>
+    </section>}
     <section className="panel form-panel">
       <div className="switch" role="group" aria-label="Transcript source">
         <button type="button" aria-pressed={method === 'file'} onClick={() => { setMethod('file'); setDuplicate(null) }}>Upload file</button>

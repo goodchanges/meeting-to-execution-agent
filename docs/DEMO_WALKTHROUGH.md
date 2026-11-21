@@ -16,7 +16,7 @@ uv run uvicorn backend.app.main:app --port 8001 --no-access-log --no-proxy-heade
 
 On a fresh checkout, the regular README startup with `.env.example` also works. Keep `GITHUB_TOKEN` blank and set `REMINDER_DAYS=30` for this walkthrough. The demo uses the two local fixtures and requires no AI credentials.
 
-1. Open [the isolated MeetFlow demo](http://localhost:8001), or use port 8000 for the regular README startup. Register using the link in the development outbox. Upload `samples/meeting1_2026-11-18.txt` as **Launch kickoff**. Leave the date blank to read it from the filename. Select **Extract decisions and tasks**.
+1. Open [the isolated MeetFlow demo](http://localhost:8001), or use port 8000 for the regular README startup. Create a workspace using the registration link in the development outbox. From **Upload transcript**, download both demo transcripts. Upload the TXT file as **Launch kickoff**. Leave the date blank to read it from the filename. Select **Extract decisions and tasks**.
 2. In **Review center**, approve the Dec 15 launch decision, the authentication requirement and Sarah and Rahul's tasks. Check **Decision memory**.
 3. Upload and process `samples/meeting2_2026-11-20.vtt` as **Launch follow-up**. Compare both sources in **Conflict center**. Launch is **Supersedes**. Authentication is **Consistent**. Choose **Accept replacement**, confirm, and then approve Alex's checklist in **Review center**.
 4. In **Action items**, select **Create GitHub issue** on Alex's approved task and inspect the confirmation. With the token blank, **Confirm post** is disabled. A separately configured live GitHub flow publishes only after explicit confirmation.

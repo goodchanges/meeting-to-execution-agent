@@ -1,9 +1,9 @@
 import { Component, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router'
+import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import {
-  Activity, Bell, BookOpen, CalendarDays, ClipboardCheck, FileText, GitCompareArrows, LayoutGrid,
+  Bell, BookOpen, CalendarDays, ClipboardCheck, FileText, GitCompareArrows, LayoutGrid,
   ListChecks, LogOut, Menu, Settings, UploadCloud, X,
 } from 'lucide-react'
 import { api, ApiError, type Account, useAction, useData } from './api'
@@ -11,13 +11,10 @@ import { AccountSettings, Dashboard, Notifications, WeeklyDigests } from './work
 import { ActionItems, Conflicts, Memory, ReviewCenter } from './review'
 import { MeetingDetail, MeetingList, Upload } from './meetings'
 import { Privacy, Terms } from './policies'
+import { Brand, Footer, Landing } from './landing'
 import { Empty, Load, ModeLabel, onSubmit, Problem, TextLink } from './ui'
 import './styles.css'
 
-function Brand() {
-  return <Link to="/" className="brand"><span><Activity size={20} /></span>MeetFlow</Link>
-}
-function Footer() { return <footer><span>MeetFlow</span><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></footer> }
 type AuthMode = 'login' | 'register' | 'register/confirm' | 'forgot' | 'reset'
 const authTitles: Record<AuthMode, string> = {
   login: 'Sign in to MeetFlow', register: 'Create your workspace', 'register/confirm': 'Complete registration', forgot: 'Reset your password', reset: 'Choose a new password',
@@ -100,7 +97,7 @@ function Shell({ account }: { account: Account }) {
       <Routes>
         <Route path="/" element={<Dashboard account={account} />} />
         <Route path="/meetings" element={<MeetingList />} /><Route path="/meetings/:id" element={<MeetingDetail />} />
-        <Route path="/upload" element={<Upload />} /><Route path="/review" element={<ReviewCenter />} />
+        <Route path="/upload" element={<Upload mode={account.ai_mode} />} /><Route path="/review" element={<ReviewCenter />} />
         <Route path="/memory" element={<Memory />} /><Route path="/conflicts" element={<Conflicts />} />
         <Route path="/actions" element={<ActionItems />} /><Route path="/notifications" element={<Notifications />} />
         <Route path="/digests" element={<WeeklyDigests />} /><Route path="/settings" element={<AccountSettings account={account} onExit={exit} />} />
@@ -113,7 +110,10 @@ function Shell({ account }: { account: Account }) {
 
 function PrivateWorkspace() {
   const account = useData<Account>('/account')
-  if (account.error instanceof ApiError && account.error.status === 401) return <Navigate to="/login" replace />
+  const { pathname } = useLocation()
+  if (account.error instanceof ApiError && account.error.status === 401) {
+    return pathname === '/' ? <Landing /> : <Navigate to="/login" replace />
+  }
   return <Load query={account}>{value => <Shell account={value} />}</Load>
 }
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
