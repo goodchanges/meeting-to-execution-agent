@@ -1,0 +1,18 @@
+services:
+  meetflow:
+    image: ${MEETFLOW_IMAGE:-meetflow}:${MEETFLOW_TAG:?Set a git SHA image tag}
+    restart: unless-stopped
+    env_file:
+      - ./staging.env
+    environment:
+      APP_ENV: staging
+      DB_PATH: /data/meetflow.sqlite
+      BACKUP_DIR: /data/backups
+      PORT: "8000"
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - staging-data:/data
+
+volumes:
+  staging-data:

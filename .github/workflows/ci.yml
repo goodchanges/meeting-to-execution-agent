@@ -1,0 +1,40 @@
+name: MeetFlow CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          version: "0.11.21"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: uv sync --locked --python 3.13
+      - run: uv run ruff check backend scripts evals
+      - run: uv run mypy backend scripts evals
+      - run: uv run pytest -q
+      - run: uv run python -m evals.run_evals --provider fake
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint && npm run typecheck && npm test && npm run build
+        working-directory: frontend
+      - run: |
+          uv export --locked --no-dev --no-emit-project -o "$RUNNER_TEMP/meetflow-requirements.txt" > /dev/null
+          uv run pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/meetflow-requirements.txt"
+      - run: npm audit --audit-level=high
+        working-directory: frontend
+      - run: docker build -f deploy/Dockerfile --build-arg "APP_VERSION=$GITHUB_SHA" -t meetflow:ci .
+      - run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 git --redact /repo

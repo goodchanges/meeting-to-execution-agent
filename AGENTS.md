@@ -5,3 +5,5 @@ Read this file, README.md, docs/IMPLEMENTATION_LOG.md and git status before resu
 Use Python/FastAPI, uv, SQLAlchemy/SQLite/Alembic and React/TypeScript/Vite. Follow README commands from the repository root. Keep owner scoping, validation and approvals on the server. Prioritize the seven P0 workflows and run the two-meeting mocked integration test before operations polish.
 
 Never commit or log secrets. Ship nothing externally without explicit approval. Mock GitHub and AI in automated tests. Runtime live AI requires explicit configuration and incurs separate provider charges. Label fixture-backed data DEMO MODE — not live AI. Report actual checks and mark unavailable checks NOT RUN. Keep the runtime single-instance and the implementation small.
+
+Run `uv run ruff check backend scripts evals`, `uv run mypy backend scripts evals`, `uv run pytest -q`, `npm --prefix frontend test` and `npm --prefix frontend run build`. Use `uv run python -m evals.run_evals --provider fake` for offline evaluation. Update restore validation when introducing a schema revision. Read docs/OPERATIONS.md before changing persistence, deployments or backups.

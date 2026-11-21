@@ -27,6 +27,9 @@ from .observability import Metrics
 from .security import Limiter, limit
 
 log = logging.getLogger("meetflow")
+log.setLevel(logging.INFO)
+if not log.hasHandlers():
+    log.addHandler(logging.StreamHandler())
 
 
 def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None):

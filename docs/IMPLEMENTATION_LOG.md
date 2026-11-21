@@ -17,3 +17,7 @@ Added review and conflict state transitions, issue reconciliation, reminders and
 ## 2026-11-21 — Frontend and security
 
 Built responsive workspace, transcript upload, review, conflict comparison, action confirmation, digest and settings pages. Edge smoke passed registration, TXT and VTT uploads, extraction, approval, conflict resolution, decision memory, digest generation and mobile navigation. Added reset, reauthentication, cascade deletion, rate limits, global call accounting and security checks. Next: close out quality and operations.
+
+## 2026-11-21 — Quality, operations and verification
+
+Backend: 38 pytest cases passed, including the two-meeting workflow, scheduled digest callback, coverage of protected routes, account cleanup, mocked provider failures and pre- and post-migration backup restores. Ruff and mypy passed. Frontend: npm ci, ESLint, TypeScript, 2 Vitest cases and Vite build passed. Fake eval: 24/24. pip-audit and npm audit reported no known findings. A pre-migration snapshot was restored and verified against its schema revision. The demo-reset command was exercised twice using a generated test password. Sequential local HTTP performance on a disposable database: 25 samples per endpoint, p95 2.84–4.18 ms. GitHub CI, Docker build and rollback, live provider calls, SMTP and deployment were not run.
