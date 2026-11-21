@@ -13,7 +13,7 @@ dependencies = [
   "pydantic-settings>=2.12,<3",
   "python-multipart>=0.0.26,<1",
   "email-validator>=2.2,<3",
-  "tzdata>=2025.2",
+  "tzdata>=2026.6",
   "google-genai>=2.34,<3",
 ]
 
