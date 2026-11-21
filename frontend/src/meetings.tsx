@@ -56,6 +56,7 @@ export function Upload() {
 }
 
 export function MeetingDetail() {
+  const [replace, setReplace] = useState(false)
   const { id } = useParams()
   const query = useData<Detail>(`/meetings/${id}`)
   return <Load query={query}>{meeting => <>
@@ -71,7 +72,11 @@ export function MeetingDetail() {
         {meeting.status === 'FAILED' ? 'Retry processing' : 'Extract decisions and tasks'}</button>}</Controls>
     </section>}
     {meeting.status === 'EXTRACTED' && <div className="panel inset"><h2>Extraction complete</h2>
-      <p>{meeting.decisions.length} decisions · {meeting.action_items.length} action items</p><TextLink to="/review">Open review center</TextLink></div>}
+      <p>{meeting.decisions.length} decisions · {meeting.action_items.length} action items</p><TextLink to="/review">Open review center</TextLink>
+      <Controls>{(run, pending) => replace ? <div className="confirm"><p>Replace this meeting’s unreviewed extraction? The original transcript stays saved.</p>
+        <div className="buttons"><button disabled={pending} onClick={() => void run(`/meetings/${id}/process?reprocess=true`).then(ok => { if (ok) setReplace(false) })}>Confirm replacement</button>
+          <button disabled={pending} onClick={() => setReplace(false)}>Cancel</button></div></div>
+        : <div><button onClick={() => setReplace(true)}>Replace unreviewed extraction</button></div>}</Controls></div>}
     <section className="panel inset transcript"><h2>Transcript</h2>
       {meeting.participants.length > 0 && <p>{meeting.participants.map(person => person.name).join(' · ')}</p>}
       {meeting.segments.map(segment => <div className="segment" key={segment.id}>

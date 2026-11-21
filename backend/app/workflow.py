@@ -301,7 +301,9 @@ def complete_task(record_id: str, request: Request, user: User):
 
 
 @router.post("/action-items/{record_id}/github")
-def create_issue(record_id: str, request: Request, user: User):
+def create_issue(
+    record_id: str, request: Request, user: User, expected_repo: str | None = None
+):
     uid = user["id"]
     settings = request.app.state.settings
     github = request.app.state.github
@@ -336,6 +338,11 @@ def create_issue(record_id: str, request: Request, user: User):
                 m.app_settings.c.user_id == uid,
             )
         )
+        if expected_repo and expected_repo.casefold() != (repo or "").casefold():
+            raise HTTPException(
+                409,
+                "The issue destination changed. Refresh and confirm the repository again.",
+            )
         if not github.configured or not repo:
             raise HTTPException(
                 409, "Configure a GitHub repository and server token first."

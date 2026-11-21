@@ -214,6 +214,9 @@ def current_user(request: Request, response: Response) -> dict:
                         samesite="lax",
                         max_age=int(lifetime.total_seconds()),
                     )
+    request.app.state.limiter.check(
+        f"api:user:{user['id']}", request.app.state.settings.rate_general, 60
+    )
     request.state.session_id = session["id"]
     request.state.user_ref = reference(request, user["id"])
     return user

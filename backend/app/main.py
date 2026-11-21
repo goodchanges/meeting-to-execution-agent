@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 import re
@@ -12,15 +13,17 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from sqlalchemy import text
+from sqlalchemy import Integer, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
-from . import auth, jobs, meetings, workflow
+from . import accounts, auth, jobs, meetings, workflow
 from .ai import DemoProvider, LiveProvider
 from .config import Settings
 from .db import engine_for, utcnow
 from .github import GitHub
+from .models import ai_usage
+from .observability import Metrics
 from .security import Limiter, limit
 
 log = logging.getLogger("meetflow")
@@ -55,6 +58,8 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
         DemoProvider() if settings.ai_mode == "demo" else LiveProvider(settings)
     )
     app.state.limiter = Limiter()
+    app.state.metrics = Metrics()
+    app.state.email = accounts.email_for(settings)
     app.state.github = GitHub(settings.github_token.get_secret_value())
     config = Config("alembic.ini")
     head = ScriptDirectory.from_config(config).get_current_head()
@@ -69,11 +74,22 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
-        fields = ", ".join(dict.fromkeys(str(e["loc"][-1]) for e in exc.errors()))
+        fields = ", ".join(
+            dict.fromkeys(
+                str(e["loc"][-1])
+                for e in exc.errors()
+                if e["type"] != "extra_forbidden"
+            )
+        )
+        message = (
+            f"Invalid or missing field: {fields}."
+            if fields
+            else "The request contains unexpected fields."
+        )
         return JSONResponse(
             {
                 "error_id": request.state.request_id,
-                "message": f"Invalid or missing field: {fields}.",
+                "message": message,
             },
             status_code=422,
         )
@@ -90,7 +106,11 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
             scheme = request.url.scheme
             if request.client and request.client.host in settings.trusted_proxies:
                 scheme = request.headers.get("x-forwarded-proto", scheme)
-            if settings.secure and scheme != "https":
+            if (
+                settings.secure
+                and scheme != "https"
+                and request.url.path not in {"/healthz", "/readyz"}
+            ):
                 target = settings.public_url.rstrip("/") + request.url.path
                 response = RedirectResponse(target, status_code=307)
             else:
@@ -134,6 +154,13 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         route = request.scope.get("route")
         duration = round((monotonic() - started) * 1000, 2)
+        template = getattr(route, "path", "unmatched")
+        app.state.metrics.record(
+            f"{request.method} {template}",
+            response.status_code,
+            duration,
+            not template.endswith("/process"),
+        )
         log.info(
             json.dumps(
                 {
@@ -165,6 +192,8 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
     app.include_router(workflow.router)
     app.include_router(jobs.router)
     app.include_router(auth.bootstrap)
+    app.include_router(accounts.bootstrap)
+    app.include_router(accounts.router)
     app.include_router(auth.protected)
 
     @app.get("/healthz")
@@ -181,6 +210,35 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
         except SQLAlchemyError as exc:
             log.warning("readiness check failed: %s", type(exc).__name__)
         return JSONResponse({"status": "not-ready"}, status_code=503)
+
+    @app.get("/metrics", include_in_schema=False)
+    def metrics(request: Request):
+        token = settings.metrics_token.get_secret_value()
+        if not token:
+            raise HTTPException(404, "Endpoint not found.")
+        supplied = request.headers.get("authorization", "").encode()
+        if not hmac.compare_digest(supplied, f"Bearer {token}".encode()):
+            raise HTTPException(401, "Metrics bearer token required.")
+        with engine.connect() as db:
+            aggregate = (
+                db.execute(
+                    select(
+                        func.count().label("calls"),
+                        func.sum(
+                            func.cast(ai_usage.c.success.is_(False), Integer)
+                        ).label("failures"),
+                        func.sum(ai_usage.c.input_tokens).label("input_tokens"),
+                        func.sum(ai_usage.c.output_tokens).label("output_tokens"),
+                        func.avg(ai_usage.c.latency_ms).label("average_latency_ms"),
+                    )
+                )
+                .mappings()
+                .one()
+            )
+        return JSONResponse(
+            {"api": app.state.metrics.snapshot(), "ai": dict(aggregate)},
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.get("/{path:path}", include_in_schema=False)
     def frontend(path: str):

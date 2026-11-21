@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router'
 import { ArrowRight, GitPullRequest, Plus } from 'lucide-react'
 import { type Decision, type Relation, type Task, useData } from './api'
@@ -59,7 +59,7 @@ export function TaskCard({ item }: { item: Task }) {
       </form>}
       {confirm && <div className="confirm"><h3>Post this task to GitHub?</h3>
         <Load query={settings}>{prefs => <p>{repo ? `GitHub repository: ${repo}. The issue includes the task, deadline and quoted transcript evidence.${prefs.github_ready ? '' : ' A server token is required.'}` : 'Set a repository in Settings before posting.'}</p>}</Load>
-        <div className="buttons"><button className="primary" disabled={pending || !repo || !settings.data?.github_ready} onClick={() => void run(path + '/github').then(ok => { if (ok) setConfirm(false) })}>Confirm post</button>
+        <div className="buttons"><button className="primary" disabled={pending || !repo || !settings.data?.github_ready} onClick={() => void run(path + '/github?expected_repo=' + encodeURIComponent(repo ?? '')).then(ok => { if (ok) setConfirm(false) })}>Confirm post</button>
           <button disabled={pending} onClick={() => setConfirm(false)}>Cancel</button><TextLink to="/settings">Settings</TextLink></div>
       </div>}
       <div className="buttons">
@@ -118,6 +118,7 @@ export function Memory() {
 
 const choices = { KEEP_PREVIOUS: 'Keep previous', ACCEPT_NEW_SUPERSEDES: 'Accept replacement', KEEP_BOTH: 'Keep both', DISMISSED_CONSISTENT: 'Acknowledge' }
 function ComparisonCard({ item }: { item: Relation }) {
+  const resolutionId = useId()
   const [choice, setChoice] = useState<keyof typeof choices | ''>('')
   return <article className="panel record">
     <div className="record-top"><h3>{item.new.decision.topic}</h3><Badge status={item.relation} /></div>
@@ -131,11 +132,11 @@ function ComparisonCard({ item }: { item: Relation }) {
     <p>{item.reason}</p>
     {item.resolution !== 'PENDING' ? <Badge status={item.resolution} /> : <Controls>{(run, pending) => <form
       onSubmit={onSubmit(data => { if (choice) void run(`/relations/${item.id}/resolve`, { resolution: choice, note: data.get('note') || null }) })}>
-      <label>Resolution<select value={choice} onChange={event => setChoice(event.target.value as keyof typeof choices | '')} required>
+      <label htmlFor={resolutionId}>Resolution</label><select id={resolutionId} value={choice} onChange={event => setChoice(event.target.value as keyof typeof choices | '')} required>
         <option value="">Choose a resolution</option>
         {Object.entries(choices).filter(([key]) => (item.relation === 'CONSISTENT') === (key === 'DISMISSED_CONSISTENT'))
           .map(([key, value]) => <option key={key} value={key}>{value}</option>)}
-      </select></label>
+      </select>
       <label>Resolution note (optional)<input name="note" maxLength={2000} /></label>
       <button className="primary" disabled={pending || !choice}>Confirm resolution</button>
     </form>}</Controls>}

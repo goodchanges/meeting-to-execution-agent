@@ -13,3 +13,7 @@ Added migrated SQLite, session auth, transcript ingestion and schema-validated A
 ## 2026-11-21 — Execution workflow
 
 Added review and conflict state transitions, issue reconciliation, reminders and weekly digests. The automated two-meeting scenario passed with fixture-backed AI and GitHub HTTP mocked. Next: frontend and security completion.
+
+## 2026-11-21 — Frontend and security
+
+Built responsive workspace, transcript upload, review, conflict comparison, action confirmation, digest and settings pages. Edge smoke passed registration, TXT and VTT uploads, extraction, approval, conflict resolution, decision memory, digest generation and mobile navigation. Added reset, reauthentication, cascade deletion, rate limits, global call accounting and security checks. Next: close out quality and operations.

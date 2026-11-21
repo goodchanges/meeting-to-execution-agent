@@ -6,7 +6,14 @@ from pathlib import Path
 from typing import Annotated, Literal, Protocol, TypeVar
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+)
 
 from .config import Settings
 from .transcripts import parse
@@ -18,6 +25,11 @@ Evidence = Annotated[str, StringConstraints(min_length=1, max_length=1200)]
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, strict=True)
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def strip_controls(cls, value):
+        return clean(value) if isinstance(value, str) else value
 
 
 class Decision(StrictModel):
@@ -136,6 +148,11 @@ class LiveProvider:
                     "input": user_content,
                     "max_output_tokens": max_output_tokens,
                     "store": False,
+                    **(
+                        {"reasoning": {"effort": "none"}}
+                        if self.model == "gpt-6-luna"
+                        else {}
+                    ),
                     "text": {
                         "format": {
                             "type": "json_schema",
@@ -212,8 +229,7 @@ class DemoProvider:
             }
         return schema.model_validate(result), Usage()
 
-    @staticmethod
-    def relation(new: dict, prior: dict):
+    def relation(self, new: dict, prior: dict):
         if new["subject_key"] != prior["subject_key"]:
             return "UNRELATED"
         if new["description"] == prior["description"]:

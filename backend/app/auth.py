@@ -73,6 +73,7 @@ def login(data: Credentials, request: Request, response: Response):
         reference(request, email),
     )
     with request.app.state.engine.begin() as db:
+        db.exec_driver_sql("BEGIN IMMEDIATE")
         user = (
             db.execute(select(users).where(users.c.email == email)).mappings().first()
         )

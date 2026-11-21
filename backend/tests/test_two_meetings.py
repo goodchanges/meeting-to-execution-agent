@@ -92,7 +92,9 @@ def test_two_meeting_scenario(setup):
     assert old["status"] == "SUPERSEDED"
     assert old["superseded_by_decision_id"] == change["new_decision_id"]
     assert history[change["new_decision_id"]]["status"] == "APPROVED"
-    result = client.post(endpoint).json()
+    assert client.post(endpoint + "?expected_repo=other/repo").status_code == 409
+    assert requests == []
+    result = client.post(endpoint + "?expected_repo=demo/meetflow").json()
     assert result["github_state"] == "CREATED"
     assert result["github_issue_url"] == "https://github.com/demo/meetflow/issues/7"
     assert (

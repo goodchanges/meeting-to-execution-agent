@@ -8,6 +8,7 @@ from typing import Annotated, TypeVar
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from . import models as m
 from .ai import (
@@ -35,6 +36,7 @@ FORMATS = {
     "srt": {
         "application/x-subrip",
         "application/srt",
+        "text/srt",
         "text/plain",
         "application/octet-stream",
     },
@@ -63,10 +65,8 @@ async def upload_meeting(
             str(getattr(upload, "filename", "")).replace("\\", "/")
         ).name
         fmt = filename.rpartition(".")[2].lower()
-        if (
-            fmt not in FORMATS
-            or getattr(upload, "content_type", None) not in FORMATS[fmt]
-        ):
+        mime = (upload.content_type or "").split(";", 1)[0].strip().casefold()
+        if fmt not in FORMATS or mime not in FORMATS[fmt]:
             raise HTTPException(415, "Upload a supported TXT, VTT, or SRT transcript.")
         raw = await file.read(settings.max_upload_bytes + 1)
     else:
@@ -201,12 +201,30 @@ def call_ai(
                     m.ai_usage.c.provider != "demo",
                 )
             )
-            if provider.name != "demo" and (
-                db.scalar(query) >= settings.ai_global_monthly_call_cap
-                or db.scalar(query.where(m.ai_usage.c.user_id == uid))
-                >= (settings.ai_user_monthly_call_cap if user_cap is None else user_cap)
-            ):
-                raise ProviderError("The monthly AI call limit has been reached.")
+            if provider.name != "demo":
+                month = start.date()
+                global_count = (
+                    db.scalar(
+                        select(m.ai_monthly_totals.c.calls).where(
+                            m.ai_monthly_totals.c.month == month,
+                        )
+                    )
+                    or 0
+                )
+                if global_count >= settings.ai_global_monthly_call_cap or db.scalar(
+                    query.where(m.ai_usage.c.user_id == uid)
+                ) >= (
+                    settings.ai_user_monthly_call_cap if user_cap is None else user_cap
+                ):
+                    raise ProviderError("The monthly AI call limit has been reached.")
+                db.execute(
+                    sqlite_insert(m.ai_monthly_totals)
+                    .values(month=month, calls=1)
+                    .on_conflict_do_update(
+                        index_elements=["month"],
+                        set_={"calls": m.ai_monthly_totals.c.calls + 1},
+                    )
+                )
             usage_id = insert(
                 db,
                 m.ai_usage,
@@ -428,8 +446,44 @@ def process_records(request, meeting, segments, memory):
     return decisions, tasks
 
 
+def clear_unreviewed(db, request, uid, meeting_id):
+    decisions = select(m.decisions.c.id).where(
+        m.decisions.c.user_id == uid,
+        m.decisions.c.meeting_id == meeting_id,
+    )
+    tasks = select(m.action_items.c.id).where(
+        m.action_items.c.user_id == uid,
+        m.action_items.c.meeting_id == meeting_id,
+    )
+    comparisons = select(m.decision_relations.c.id).where(
+        m.decision_relations.c.user_id == uid,
+        m.decision_relations.c.new_decision_id.in_(decisions),
+    )
+    touched = db.scalar(
+        select(m.audit_logs.c.id)
+        .where(
+            m.audit_logs.c.object_id.in_(decisions.union_all(tasks, comparisons)),
+        )
+        .limit(1)
+    )
+    if touched:
+        raise HTTPException(
+            409,
+            "Reviewed or edited records are preserved. Upload a separate copy to run a new extraction.",
+        )
+    for table in (m.decisions, m.action_items):
+        db.execute(
+            table.delete().where(
+                table.c.user_id == uid, table.c.meeting_id == meeting_id
+            )
+        )
+    audit(db, request, uid, "replace_unreviewed", "meeting", meeting_id)
+
+
 @protected.post("/meetings/{meeting_id}/process")
-def process_meeting(meeting_id: str, request: Request, user: User):
+def process_meeting(
+    meeting_id: str, request: Request, user: User, reprocess: bool = False
+):
     from uuid import uuid4
 
     uid = user["id"]
@@ -442,7 +496,9 @@ def process_meeting(meeting_id: str, request: Request, user: User):
         db.exec_driver_sql("BEGIN IMMEDIATE")
         meeting = get_owned_or_404(db, m.meetings, uid, meeting_id)
         if meeting["status"] == "EXTRACTED":
-            raise HTTPException(409, "This meeting has already been extracted.")
+            if not reprocess:
+                raise HTTPException(409, "This meeting has already been extracted.")
+            clear_unreviewed(db, request, uid, meeting_id)
         if meeting["status"] == "PROCESSING" and meeting[
             "processing_started_at"
         ] > claim - timedelta(minutes=15):

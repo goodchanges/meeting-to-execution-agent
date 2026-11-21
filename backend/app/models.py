@@ -321,6 +321,13 @@ ai_usage = Table(
     Column("created_at", DateTime, nullable=False),
 )
 
+ai_monthly_totals = Table(
+    "ai_monthly_totals",
+    metadata,
+    Column("month", Date, primary_key=True),
+    Column("calls", Integer, nullable=False),
+)
+
 audit_logs = Table(
     "audit_logs",
     metadata,
