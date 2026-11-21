@@ -21,3 +21,9 @@ Built responsive workspace, transcript upload, review, conflict comparison, acti
 ## 2026-11-21 — Quality, operations and verification
 
 Backend: 38 pytest cases passed, including the two-meeting workflow, scheduled digest callback, coverage of protected routes, account cleanup, mocked provider failures and pre- and post-migration backup restores. Ruff and mypy passed. Frontend: npm ci, ESLint, TypeScript, 2 Vitest cases and Vite build passed. Fake eval: 24/24. pip-audit and npm audit reported no known findings. A pre-migration snapshot was restored and verified against its schema revision. The demo-reset command was exercised twice using a generated test password. Sequential local HTTP performance on a disposable database: 25 samples per endpoint, p95 2.84–4.18 ms. GitHub CI, Docker build and rollback, live provider calls, SMTP and deployment were not run.
+
+## 2026-11-21 — GitHub routing, undated tasks and signup privacy
+
+Pinned all outbound issue requests to GITHUB_REPOSITORY. Account Settings displays that destination read-only. Legacy issue attempts that target a different or unknown repository stop for operator reconciliation. Added explicit no-deadline confirmation, retained review for ambiguous dates, and handled undated tasks in issues, reminders and digests. Public registration returns a generic 202 without cookies and uses a single-use email link before account creation. Alembic 0003 adds the signup token table and deadline flag.
+
+Verified locally: 55 pytest cases passed, including the two-meeting integration test rerun separately. Ruff and mypy passed. npm test passed 2 cases, and ESLint and Vite build passed. Offline evals passed 24/24. Edge confirmed signup through the development outbox and the read-only repository. pip-audit and npm audit reported no known vulnerabilities in their audited sets. Gitleaks found no leaks. Live OpenAI, GitHub, SMTP and deployment were NOT RUN.

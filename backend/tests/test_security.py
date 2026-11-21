@@ -14,7 +14,7 @@ from backend.app.ai import Usage
 from backend.app.github import GitHub
 from backend.app.security import current_user, digest
 
-from .conftest import Browser, register
+from .conftest import Browser, Mailbox, register
 from .test_two_meetings import approve, extract, upload
 
 
@@ -43,6 +43,7 @@ def test_router_auth_enforced(setup):
         "/readyz",
         "/{path:path}",
         "/api/auth/register",
+        "/api/auth/register/confirm",
         "/api/auth/login",
         "/api/auth/reset/request",
         "/api/auth/reset/confirm",
@@ -129,6 +130,7 @@ def test_cross_user_isolation(setup):
     calls: list[httpx.Request] = []
     app.state.github = GitHub(
         "mock",
+        "demo/meetflow",
         httpx.MockTransport(reject_external(calls)),
     )
     with Browser(app) as other:
@@ -171,17 +173,6 @@ def test_cross_user_isolation(setup):
         )
     assert calls == []
     assert client.get(f"/api/meetings/{mid}").is_success
-
-
-class Mailbox:
-    def __init__(self):
-        self.messages = []
-
-    def send(self, recipient, link):
-        self.messages.append((recipient, link))
-
-    def token(self):
-        return self.messages[-1][1].split("#token=")[1]
 
 
 def test_reset_lifecycle(setup, caplog):
@@ -312,6 +303,7 @@ def test_injection_is_data_and_cannot_approve(setup, caplog):
     seen: list[httpx.Request] = []
     app.state.github = GitHub(
         sentinel,
+        "demo/meetflow",
         httpx.MockTransport(reject_external(seen)),
     )
     source = Path("samples/injection_attempt.txt").read_text(encoding="utf-8")

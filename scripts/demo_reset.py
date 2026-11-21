@@ -10,6 +10,7 @@ from backend.app.config import Settings
 from backend.app.main import create_app
 from backend.app.models import users
 from backend.app.security import CSRF
+from scripts.local_signup import register_from_outbox
 
 DEMO_EMAIL = "meetflow-demo@example.org"
 DEMO_DB = Path("data/demo.sqlite")
@@ -35,15 +36,7 @@ def main():
             db.execute(users.delete().where(users.c.id == uid))
     with TestClient(app) as client:
         headers = {"x-meetflow-client": "1"}
-        client.post(
-            "/api/auth/register",
-            headers=headers,
-            json={
-                "email": DEMO_EMAIL,
-                "password": password,
-                "display_name": "Alex",
-            },
-        ).raise_for_status()
+        register_from_outbox(client, DEMO_EMAIL, password, "Alex", settings.dev_outbox)
         headers["x-csrf-token"] = client.cookies[CSRF]
         sample = Path("samples/meeting1_2026-11-18.txt")
         response = client.post(

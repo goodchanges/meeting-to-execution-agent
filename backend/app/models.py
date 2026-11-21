@@ -47,6 +47,14 @@ sessions = Table(
     Column("revoked", Boolean, nullable=False),
 )
 
+registration_tokens = Table(
+    "registration_tokens",
+    metadata,
+    Column("token_hash", String, primary_key=True),
+    Column("email", String, nullable=False, index=True),
+    Column("expires_at", DateTime, nullable=False, index=True),
+)
+
 password_reset_tokens = Table(
     "password_reset_tokens",
     metadata,
@@ -243,6 +251,7 @@ action_items = Table(
     Column("owner_resolved", Boolean, nullable=False),
     Column("deadline", Date),
     Column("deadline_raw", String),
+    Column("no_deadline_confirmed", Boolean, nullable=False, server_default="0"),
     Column("evidence_excerpt", Text, nullable=False),
     Column("evidence_ts", String),
     Column("evidence_verified", Boolean, nullable=False),

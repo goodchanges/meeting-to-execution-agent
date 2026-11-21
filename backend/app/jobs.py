@@ -14,16 +14,9 @@ from .security import audit, current_user, now
 from .workflow import Input, blockers, update
 
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
-Repo = Annotated[
-    str,
-    StringConstraints(
-        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}/[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$",
-    ),
-]
 
 
 class SettingsInput(Input):
-    github_repo: Repo | None
     timezone: Annotated[str, StringConstraints(min_length=1, max_length=80)]
 
 
@@ -36,7 +29,7 @@ def get_settings(request: Request, user: User):
     with request.app.state.engine.connect() as db:
         values = settings_for(db, user["id"])
     return {
-        "github_repo": values["github_repo"],
+        "github_repo": request.app.state.github.repository or None,
         "timezone": values["timezone"],
         "github_ready": request.app.state.github.configured,
     }
@@ -149,13 +142,14 @@ def digest_people(db, uid, prefs, current, window):
             {
                 "id": task["id"],
                 "title": task["title"],
-                "deadline": str(task["deadline"]),
+                "deadline": task["deadline"].isoformat() if task["deadline"] else None,
                 "status": "Completed"
                 if task["completed_at"]
                 else "Overdue"
-                if task["deadline"] < today
+                if task["deadline"] and task["deadline"] < today
                 else "Upcoming"
-                if task["deadline"] <= today + timedelta(days=window)
+                if task["deadline"]
+                and task["deadline"] <= today + timedelta(days=window)
                 else "Open",
             }
             for task in assigned

@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from . import models as m
 from .auth import Password, User
+from .auth import bootstrap as auth_bootstrap
 from .config import Settings
 from .db import insert, rows
 from .security import (
@@ -32,21 +33,30 @@ from .security import (
     limit,
     now,
     reference,
+    start_session,
     verify,
 )
 
 bootstrap = APIRouter(prefix="/api/auth/reset", dependencies=[Depends(bootstrap_csrf)])
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 RESET_MESSAGE = "If the account exists and email delivery is available, a reset link will arrive shortly."
+SIGNUP_MESSAGE = "If this email is eligible, a registration link will arrive shortly."
+EmailToken = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9_-]{43}$")]
 
 
-class ResetRequest(BaseModel):
+class EmailRequest(BaseModel):
     email: EmailStr
 
 
 class ResetConfirm(BaseModel):
-    token: Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9_-]{43}$")]
+    token: EmailToken
     password: Password
+
+
+class SignupConfirm(ResetConfirm):
+    display_name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)
+    ]
 
 
 class Reauth(BaseModel):
@@ -62,17 +72,17 @@ class DeleteAccount(Reauth):
 
 
 class EmailProvider(Protocol):
-    def send(self, recipient: str, link: str) -> None: ...
+    def send(self, recipient: str, link: str, subject: str) -> None: ...
 
 
 class DevOutboxEmailProvider:
     def __init__(self, directory: Path):
         self.directory = directory
 
-    def send(self, recipient: str, link: str):
+    def send(self, recipient: str, link: str, subject: str):
         self.directory.mkdir(parents=True, exist_ok=True)
         (self.directory / f"{uuid4().hex}.txt").write_text(
-            f"To: {recipient}\n\nReset your MeetFlow password: {link}\n",
+            f"To: {recipient}\nSubject: {subject}\n\n{link}\n",
             encoding="utf-8",
         )
 
@@ -81,15 +91,13 @@ class SmtpEmailProvider:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def send(self, recipient: str, link: str):
+    def send(self, recipient: str, link: str, subject: str):
         settings = self.settings
         message = EmailMessage()
         message["From"] = settings.smtp_sender
         message["To"] = recipient
-        message["Subject"] = "Reset your MeetFlow password"
-        message.set_content(
-            f"Use this link within 30 minutes to reset your password:\n{link}"
-        )
+        message["Subject"] = subject
+        message.set_content(f"Use this link within 30 minutes:\n{link}")
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=8) as smtp:
             smtp.starttls(context=ssl.create_default_context())
             if settings.smtp_username:
@@ -107,8 +115,79 @@ def email_for(settings: Settings) -> EmailProvider | None:
     return None
 
 
+@auth_bootstrap.post("/register", status_code=202)
+def request_signup(data: EmailRequest, request: Request, background: BackgroundTasks):
+    settings = request.app.state.settings
+    email = data.email.casefold()
+    limit(request, "register", settings.rate_login, 60, reference(request, email))
+    provider = request.app.state.email
+    if not provider:
+        raise HTTPException(503, "Registration email is not configured.")
+    token = secrets.token_urlsafe(32)
+    current = now(request)
+    with request.app.state.engine.begin() as db:
+        db.exec_driver_sql("BEGIN IMMEDIATE")
+        db.execute(
+            m.registration_tokens.delete().where(
+                m.registration_tokens.c.expires_at <= current
+            )
+        )
+        existing = db.scalar(select(m.users.c.id).where(m.users.c.email == email))
+        if not existing:
+            db.execute(
+                m.registration_tokens.insert().values(
+                    token_hash=digest(token),
+                    email=email,
+                    expires_at=current + timedelta(minutes=30),
+                )
+            )
+    if not existing:
+        link = f"{settings.public_url.rstrip('/')}/register/confirm#token={token}"
+        background.add_task(
+            deliver_link,
+            provider,
+            email,
+            link,
+            "Confirm your MeetFlow registration",
+            request.app.state.logger,
+        )
+    return {"message": SIGNUP_MESSAGE}
+
+
+@auth_bootstrap.post("/register/confirm", status_code=201)
+def confirm_signup(data: SignupConfirm, request: Request, response: Response):
+    limit(request, "register_confirm", request.app.state.settings.rate_login, 60)
+    current = now(request)
+    password_hash = hasher.hash(data.password)
+    with request.app.state.engine.begin() as db:
+        db.exec_driver_sql("BEGIN IMMEDIATE")
+        email = db.scalar(
+            select(m.registration_tokens.c.email).where(
+                m.registration_tokens.c.token_hash == digest(data.token),
+                m.registration_tokens.c.expires_at > current,
+            )
+        )
+        if not email or db.scalar(select(m.users.c.id).where(m.users.c.email == email)):
+            raise HTTPException(400, "This registration link is invalid or expired.")
+        user_id = insert(
+            db,
+            m.users,
+            email=email,
+            password_hash=password_hash,
+            display_name=data.display_name,
+            created_at=current,
+        )
+        insert(db, m.app_settings, user_id=user_id, timezone="Asia/Kolkata")
+        db.execute(
+            m.registration_tokens.delete().where(m.registration_tokens.c.email == email)
+        )
+        audit(db, request, user_id, "register", "account")
+        start_session(db, request, response, user_id)
+    return {"id": user_id, "display_name": data.display_name}
+
+
 @bootstrap.post("/request")
-def request_reset(data: ResetRequest, request: Request, background: BackgroundTasks):
+def request_reset(data: EmailRequest, request: Request, background: BackgroundTasks):
     settings = request.app.state.settings
     email = data.email.casefold()
     limit(
@@ -134,16 +213,23 @@ def request_reset(data: ResetRequest, request: Request, background: BackgroundTa
     if uid:
         link = f"{settings.public_url.rstrip('/')}/reset#token={token}"
         background.add_task(
-            deliver_reset, provider, email, link, request.app.state.logger
+            deliver_link,
+            provider,
+            email,
+            link,
+            "Reset your MeetFlow password",
+            request.app.state.logger,
         )
     return {"message": RESET_MESSAGE}
 
 
-def deliver_reset(provider: EmailProvider, recipient: str, link: str, logger):
+def deliver_link(
+    provider: EmailProvider, recipient: str, link: str, subject: str, logger
+):
     try:
-        provider.send(recipient, link)
+        provider.send(recipient, link, subject)
     except (OSError, ValueError) as exc:
-        logger.warning("password reset delivery failed: %s", type(exc).__name__)
+        logger.warning("account email delivery failed: %s", type(exc).__name__)
 
 
 def replace_password(db, uid, password, current):

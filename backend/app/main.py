@@ -63,7 +63,9 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
     app.state.limiter = Limiter()
     app.state.metrics = Metrics()
     app.state.email = accounts.email_for(settings)
-    app.state.github = GitHub(settings.github_token.get_secret_value())
+    app.state.github = GitHub(
+        settings.github_token.get_secret_value(), settings.github_repository
+    )
     config = Config("alembic.ini")
     head = ScriptDirectory.from_config(config).get_current_head()
 

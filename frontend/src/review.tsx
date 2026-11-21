@@ -32,14 +32,15 @@ function DecisionCard({ item }: { item: Decision }) {
 export function TaskCard({ item }: { item: Task }) {
   const [edit, setEdit] = useState(false)
   const [confirm, setConfirm] = useState(false)
+  const [noDeadline, setNoDeadline] = useState(item.no_deadline_confirmed)
   const settings = useData<import('./api').Settings>('/settings', confirm)
   const editable = item.github_state === 'NOT_CREATED' && !item.completed_at
   const needs = ['PENDING', 'NEEDS_REVIEW'].includes(item.approval_status)
-  const repo = item.github_repo ?? settings.data?.github_repo
+  const repo = settings.data?.github_repo
   const canPublish = !item.completed_at && item.approval_status === 'APPROVED'
   const path = `/action-items/${item.id}`
   return <article className="panel record">
-    <div className="record-top"><div><h3>{item.title}</h3><p>{item.owner ?? 'Unassigned'} · {item.deadline ? dateLabel(item.deadline) : 'Deadline needs review'}</p></div>
+    <div className="record-top"><div><h3>{item.title}</h3><p>{item.owner ?? 'Unassigned'} · {item.deadline ? dateLabel(item.deadline) : item.no_deadline_confirmed ? 'No deadline specified' : 'Deadline needs review'}</p></div>
       <Badge status={item.completed_at ? 'COMPLETED' : item.approval_status} /></div>
     <ModeLabel mode={item.processing_mode} />
     {item.description !== item.title && <p>{item.description}</p>}
@@ -49,23 +50,26 @@ export function TaskCard({ item }: { item: Task }) {
     {item.github_issue_url && <p><a className="text-link" href={item.github_issue_url} target="_blank" rel="noreferrer"><GitPullRequest size={17} /> Open GitHub issue <ArrowRight size={15} /></a></p>}
     <Controls>{(run, pending) => <div className="review-controls">
       {edit && <form onSubmit={onSubmit(data => void run(path, {
-        title: data.get('title'), description: data.get('description'), owner: data.get('owner') || null, deadline: data.get('deadline') || null,
+        title: data.get('title'), description: data.get('description'), owner: data.get('owner') || null, deadline: data.get('deadline') || null, no_deadline_confirmed: noDeadline,
       }, 'PATCH').then(ok => { if (ok) setEdit(false) }))}>
         <label>Title<input name="title" required maxLength={180} defaultValue={item.title} /></label>
         <label>Description<textarea name="description" required maxLength={2000} defaultValue={item.description} /></label>
         <label>Owner<input name="owner" defaultValue={item.owner ?? ''} /></label>
-        <label>Deadline<input type="date" name="deadline" defaultValue={item.deadline ?? ''} /></label>
+        <label>Deadline<input type="date" name="deadline" disabled={noDeadline} defaultValue={item.deadline ?? ''} /></label>
+        {item.deadline_raw === null
+          ? <label className="buttons"><input type="checkbox" checked={noDeadline} onChange={event => setNoDeadline(event.target.checked)} /> Confirm no deadline was specified</label>
+          : !item.deadline && <p>Source deadline: {item.deadline_raw}. Enter a date to resolve it.</p>}
         <button disabled={pending}>Save edits</button>
       </form>}
       {confirm && <div className="confirm"><h3>Post this task to GitHub?</h3>
-        <Load query={settings}>{prefs => <p>{repo ? `GitHub repository: ${repo}. The issue includes the task, deadline and quoted transcript evidence.${prefs.github_ready ? '' : ' A server token is required.'}` : 'Set a repository in Settings before posting.'}</p>}</Load>
+        <Load query={settings}>{prefs => <p>{repo ? `GitHub repository: ${repo}. The issue includes the task, deadline and quoted transcript evidence.${prefs.github_ready ? '' : ' A server token is required.'}` : 'Ask an operator to configure the GitHub repository.'}</p>}</Load>
         <div className="buttons"><button className="primary" disabled={pending || !repo || !settings.data?.github_ready} onClick={() => void run(path + '/github?expected_repo=' + encodeURIComponent(repo ?? '')).then(ok => { if (ok) setConfirm(false) })}>Confirm post</button>
           <button disabled={pending} onClick={() => setConfirm(false)}>Cancel</button><TextLink to="/settings">Settings</TextLink></div>
       </div>}
       <div className="buttons">
         {needs && <><button className="primary" disabled={pending || edit || item.approval_status === 'NEEDS_REVIEW'} onClick={() => void run(path + '/review', { action: 'approve' })}>Approve task</button>
           <button disabled={pending || edit} onClick={() => void run(path + '/review', { action: 'reject' })}>Reject</button></>}
-        {editable && <button disabled={pending} onClick={() => setEdit(!edit)}>{edit ? 'Cancel edit' : 'Edit'}</button>}
+        {editable && <button disabled={pending} onClick={() => { setNoDeadline(item.no_deadline_confirmed); setEdit(!edit) }}>{edit ? 'Cancel edit' : 'Edit'}</button>}
         {canPublish && !confirm && !edit && !item.github_issue_url && <button className="primary" disabled={pending} onClick={() => setConfirm(true)}>
           <Plus size={16} />{item.github_state === 'NOT_CREATED' ? 'Create GitHub issue' : 'Retry GitHub issue'}</button>}
         {canPublish && !edit && !confirm && <button disabled={pending || item.github_state === 'CREATING'} onClick={() => void run(path + '/complete')}>Mark complete</button>}

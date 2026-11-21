@@ -10,22 +10,29 @@ class GitHubError(Exception):
 
 
 class GitHub:
-    def __init__(self, token: str, transport: httpx.BaseTransport | None = None):
+    def __init__(
+        self, token: str, repository: str, transport: httpx.BaseTransport | None = None
+    ):
         self.token = token
+        self.repository = repository
         self.transport = transport
 
     @property
     def configured(self):
-        return bool(self.token)
+        return bool(self.token and self.repository)
 
-    def publish(self, repo: str, item: dict, meeting: dict, base: str, reconcile: bool):
+    def publish(self, item: dict, meeting: dict, base: str, reconcile: bool):
+        if not self.configured:
+            raise GitHubError("Configure the server GitHub repository and token first.")
+        repo = self.repository
         marker = f"<!-- meetflow:action_item:{item['id']} -->"
         description = escape(item["description"]).replace("@", "＠")
         proof = escape(item["evidence_excerpt"]).replace("@", "＠")
         title = escape(meeting["title"]).replace("@", "＠")
         owner = escape(item["owner"]).replace("@", "＠")
+        deadline = item["deadline"] or "Not specified"
         body = (
-            f"{description}\n\nOwner: {owner}\n\nDeadline: {item['deadline']}\n\n"
+            f"{description}\n\nOwner: {owner}\n\nDeadline: {deadline}\n\n"
             f"Source: [{title}]({base.rstrip('/')}/meetings/{meeting['id']}) "
             f"({meeting['meeting_date']})\n\nEvidence ({item['evidence_ts'] or 'no timestamp'}): "
             f"{proof}\n\n{marker}"

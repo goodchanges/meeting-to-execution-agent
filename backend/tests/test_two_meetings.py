@@ -51,10 +51,12 @@ def test_two_meeting_scenario(setup):
             json={"number": 7, "html_url": "https://github.com/demo/meetflow/issues/7"},
         )
 
-    app.state.github = GitHub("mock-token", httpx.MockTransport(github))
+    app.state.github = GitHub(
+        "mock-token", "demo/meetflow", httpx.MockTransport(github)
+    )
     assert client.patch(
         "/api/settings",
-        json={"github_repo": "demo/meetflow", "timezone": "Asia/Kolkata"},
+        json={"timezone": "Asia/Kolkata"},
     ).is_success
     m1 = extract(client, upload(client, "meeting1_2026-11-18.txt", "Kickoff"))
     assert len(m1["segments"]) == 4

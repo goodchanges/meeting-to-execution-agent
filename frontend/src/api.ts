@@ -45,9 +45,9 @@ export type Decision = {
 }
 export type Task = {
   id: string; meeting_id: string; title: string; description: string; owner: string | null;
-  deadline: string | null; deadline_raw: string | null; evidence_excerpt: string; evidence_ts: string | null;
+  deadline: string | null; deadline_raw: string | null; no_deadline_confirmed: boolean; evidence_excerpt: string; evidence_ts: string | null;
   evidence_verified: boolean; approval_status: string; github_state: string; github_issue_url: string | null;
-  github_error: string | null; github_repo: string | null; completed_at: string | null; processing_mode: Mode
+  github_error: string | null; completed_at: string | null; processing_mode: Mode
 }
 export type Segment = { id: string; speaker_label: string | null; start_ts: string | null; text: string }
 export type Detail = Meeting & { segments: Segment[]; decisions: Decision[]; action_items: Task[]; participants: { name: string }[] }
@@ -58,7 +58,7 @@ export type Relation = {
 export type Notice = { id: string; kind: string; message: string; read_at: string | null; processing_mode: Mode }
 export type Digest = {
   id: string; person_name: string; week_start: string; processing_mode: Mode;
-  payload: { tasks: { id: string; title: string; deadline: string; status: string }[]; decisions: string[]; conflicts: string[] }
+  payload: { tasks: { id: string; title: string; deadline: string | null; status: string }[]; decisions: string[]; conflicts: string[] }
 }
 export type Settings = { github_repo: string | null; timezone: string; github_ready: boolean }
 

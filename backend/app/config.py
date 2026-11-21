@@ -1,8 +1,9 @@
+import re
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,6 +34,7 @@ class Settings(BaseSettings):
     memory_candidates: int = Field(default=8, ge=1, le=30)
     confidence_threshold: float = Field(default=0.7, ge=0, le=1)
     github_token: SecretStr = SecretStr("")
+    github_repository: str = ""
     scheduler_enabled: bool = True
     reminder_days: int = Field(default=2, ge=0, le=30)
     smtp_host: str = ""
@@ -49,6 +51,20 @@ class Settings(BaseSettings):
     rate_upload: int = Field(default=10, ge=1)
     rate_ai: int = Field(default=10, ge=1)
     rate_github: int = Field(default=30, ge=1)
+
+    @field_validator("github_repository")
+    @classmethod
+    def validate_github_repository(cls, value: str) -> str:
+        if not value:
+            return value
+        if not re.fullmatch(
+            r"[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}/[A-Za-z0-9_.-]{1,100}",
+            value,
+        ):
+            raise ValueError("GITHUB_REPOSITORY must use the owner/repository format.")
+        if value.split("/")[1] in {".", ".."}:
+            raise ValueError("GITHUB_REPOSITORY must name a repository.")
+        return value
 
     @property
     def secure(self) -> bool:

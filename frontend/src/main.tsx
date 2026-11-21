@@ -18,38 +18,39 @@ function Brand() {
   return <Link to="/" className="brand"><span><Activity size={20} /></span>MeetFlow</Link>
 }
 function Footer() { return <footer><span>MeetFlow</span><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></footer> }
-type AuthMode = 'login' | 'register' | 'forgot' | 'reset'
+type AuthMode = 'login' | 'register' | 'register/confirm' | 'forgot' | 'reset'
 const authTitles: Record<AuthMode, string> = {
-  login: 'Sign in to MeetFlow', register: 'Create your workspace', forgot: 'Reset your password', reset: 'Choose a new password',
+  login: 'Sign in to MeetFlow', register: 'Create your workspace', 'register/confirm': 'Complete registration', forgot: 'Reset your password', reset: 'Choose a new password',
 }
 function Auth({ mode }: { mode: AuthMode }) {
   const action = useAction()
   const navigate = useNavigate()
-  const password = mode !== 'forgot'
   const isReset = mode === 'reset'
+  const isSignupConfirmation = mode === 'register/confirm'
+  const password = mode === 'login' || isReset || isSignupConfirmation
   const submit = (fields: FormData) => {
     const data = Object.fromEntries(fields.entries())
-    if (isReset) {
+    if (isReset || isSignupConfirmation) {
       const token = new URLSearchParams(window.location.hash.slice(1)).get('token')
       data.token = token ?? ''
     }
-    const paths = { login: 'login', register: 'register', forgot: 'reset/request', reset: 'reset/confirm' }
+    const paths = { login: 'login', register: 'register', 'register/confirm': 'register/confirm', forgot: 'reset/request', reset: 'reset/confirm' }
     action.mutate({ path: '/auth/' + paths[mode], data }, {
-      onSuccess: () => { if (mode === 'register' || mode === 'login') navigate('/'); if (isReset) navigate('/login', { replace: true }) },
+      onSuccess: () => { if (isSignupConfirmation || mode === 'login') navigate('/'); if (isReset) navigate('/login', { replace: true }) },
     })
   }
   return <div className="auth-shell"><div className="auth-frame">
     <div className="auth-side"><Brand /><div><h2>From decisions<br />to execution.</h2><p>Keep a record of what your team decided, who owns the work, and what changes next.</p></div></div>
     <main className="auth-form"><h1>{authTitles[mode]}</h1>
       <form onSubmit={onSubmit(submit)}>
-        {mode === 'register' && <label>Display name<input name="display_name" autoComplete="name" required maxLength={80} /></label>}
-        {!isReset && <label>Email<input name="email" type="email" autoComplete="email" required /></label>}
+        {isSignupConfirmation && <label>Display name<input name="display_name" autoComplete="name" required maxLength={80} /></label>}
+        {!isReset && !isSignupConfirmation && <label>Email<input name="email" type="email" autoComplete="email" required /></label>}
         {password && <label>{isReset ? 'New password' : 'Password'}<input name="password" type="password" required
           minLength={mode === 'login' ? undefined : 12} maxLength={128} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>}
         {action.isError && <Problem message={action.error.message} />}
-        {mode === 'forgot' && action.isSuccess && <p role="status">{String(action.data.message)}</p>}
+        {(mode === 'forgot' || mode === 'register') && action.isSuccess && <p role="status">{String(action.data.message)}</p>}
         <button className="primary" disabled={action.isPending}>{action.isPending ? 'Working…' : {
-          login: 'Sign in', register: 'Create account', forgot: 'Send reset link', reset: 'Set password',
+          login: 'Sign in', register: 'Send registration link', 'register/confirm': 'Create account', forgot: 'Send reset link', reset: 'Set password',
         }[mode]}</button>
       </form>
       <p className="auth-links">{mode === 'login' ? <><Link to="/register">Create an account</Link><Link to="/forgot">Forgot password?</Link></> : <Link to="/login">Back to sign in</Link>}</p>
@@ -125,7 +126,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
 const cache = new QueryClient()
 createRoot(document.getElementById('root')!).render(<ErrorBoundary><QueryClientProvider client={cache}>
   <BrowserRouter><Routes>
-    {(['login', 'register', 'forgot', 'reset'] as const).map(mode => <Route path={'/' + mode} key={mode} element={<Auth key={mode} mode={mode} />} />)}
+    {(['login', 'register', 'register/confirm', 'forgot', 'reset'] as const).map(mode => <Route path={'/' + mode} key={mode} element={<Auth key={mode} mode={mode} />} />)}
     <Route path="/privacy" element={<main className="content"><Brand /><Privacy /><Footer /></main>} />
     <Route path="/terms" element={<main className="content"><Brand /><Terms /><Footer /></main>} />
     <Route path="/*" element={<PrivateWorkspace />} />

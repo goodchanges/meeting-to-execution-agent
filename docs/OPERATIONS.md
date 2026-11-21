@@ -12,6 +12,6 @@ Run `uv run python -m scripts.verify_restore SNAPSHOT` to rehearse and verify co
 
 The scheduler checks reminders each minute and generates weekly digests during the Monday 09:00 local hour. After downtime, use **Generate now**. Scheduling and rate limits are per-process.
 
-The target is p95 under 300 ms for key non-AI requests. Measure with `uv run python -m scripts.measure_perf` on its own disposable local instance, with no concurrent traffic. It writes actual counts and timing to ignored `data/performance.json`.
+The target is p95 under 300 ms for key non-AI requests. Measure with `uv run python -m scripts.measure_perf` on its own disposable development instance, with no concurrent traffic. Point the script and app at the same `DEV_OUTBOX` for synthetic signup. It writes actual counts and timing to ignored `data/performance.json`.
 
 Set provider-side spend limits and billing alerts manually. Keep a dedicated project and rotate OpenAI, GitHub and SMTP credentials as needed. Runtime AI uses separate billing from Codex. Manual live evals use their own call and estimated spend limits.

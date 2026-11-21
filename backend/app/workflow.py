@@ -2,7 +2,13 @@ from datetime import date, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    StrictBool,
+    StringConstraints,
+    field_validator,
+)
 from sqlalchemy import select
 
 from . import models as m
@@ -41,6 +47,7 @@ class TaskEdit(Input):
     description: Long
     owner: Short | None
     deadline: date | None
+    no_deadline_confirmed: StrictBool = False
 
 
 class Resolution(Input):
@@ -232,6 +239,12 @@ def resolve_relation(record_id: str, data: Resolution, request: Request, user: U
     return {"resolution": choice}
 
 
+def deadline_resolved(task: dict) -> bool:
+    return task["deadline"] is not None or (
+        task["no_deadline_confirmed"] and task["deadline_raw"] is None
+    )
+
+
 @router.patch("/action-items/{record_id}")
 def edit_task(record_id: str, data: TaskEdit, request: Request, user: User):
     uid = user["id"]
@@ -242,15 +255,20 @@ def edit_task(record_id: str, data: TaskEdit, request: Request, user: User):
             raise HTTPException(
                 409, "The issue payload is frozen after execution begins."
             )
+        if data.no_deadline_confirmed and (
+            data.deadline is not None or record["deadline_raw"] is not None
+        ):
+            raise HTTPException(422, "Resolve the source deadline by entering a date.")
+        values = data.model_dump()
         update(
             db,
             m.action_items,
             uid,
             record_id,
-            **data.model_dump(),
+            **values,
             owner_resolved=bool(data.owner),
             approval_status="PENDING"
-            if data.owner and data.deadline
+            if data.owner and deadline_resolved({**record, **values})
             else "NEEDS_REVIEW",
             edited_by_user=True,
         )
@@ -269,7 +287,7 @@ def review_task(record_id: str, data: Review, request: Request, user: User):
         if data.action == "approve" and (
             record["approval_status"] == "NEEDS_REVIEW"
             or not record["owner_resolved"]
-            or not record["deadline"]
+            or not deadline_resolved(record)
         ):
             raise HTTPException(
                 409, "Review and save the owner, deadline and task details first."
@@ -319,7 +337,7 @@ def create_issue(
         if (
             item["approval_status"] != "APPROVED"
             or not item["owner_resolved"]
-            or not item["deadline"]
+            or not deadline_resolved(item)
             or item["completed_at"]
             or blockers(db, uid, meeting_id=item["meeting_id"])
         ):
@@ -333,11 +351,7 @@ def create_issue(
             raise HTTPException(
                 409, "The issue cannot be created in its current state."
             )
-        repo = item["github_repo"] or db.scalar(
-            select(m.app_settings.c.github_repo).where(
-                m.app_settings.c.user_id == uid,
-            )
-        )
+        repo = github.repository
         if expected_repo and expected_repo.casefold() != (repo or "").casefold():
             raise HTTPException(
                 409,
@@ -346,6 +360,15 @@ def create_issue(
         if not github.configured or not repo:
             raise HTTPException(
                 409, "Configure a GitHub repository and server token first."
+            )
+        claimed_repo = item["github_repo"]
+        if (
+            state != "NOT_CREATED"
+            and (claimed_repo or "").casefold() != repo.casefold()
+        ):
+            raise HTTPException(
+                409,
+                "The previous attempt used a different or unknown repository. Ask an operator to reconcile it.",
             )
         meeting = get_owned_or_404(db, m.meetings, uid, item["meeting_id"])
         claimed = db.execute(
@@ -367,7 +390,7 @@ def create_issue(
     issue_id, url, error = None, None, None
     try:
         issue_id, url = github.publish(
-            repo, item, meeting, settings.public_url, state != "NOT_CREATED"
+            item, meeting, settings.public_url, state != "NOT_CREATED"
         )
     except GitHubError as exc:
         error = str(exc)

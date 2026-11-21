@@ -30,7 +30,7 @@ def test_github_failure_and_duplicate_reconciliation(setup, failure, word):
     approve(client, "action-items", task)
     client.patch(
         "/api/settings",
-        json={"github_repo": "demo/meetflow", "timezone": "Asia/Kolkata"},
+        json={"timezone": "Asia/Kolkata"},
     )
     calls = []
     recovered = {
@@ -47,7 +47,9 @@ def test_github_failure_and_duplicate_reconciliation(setup, failure, word):
             raise httpx.ReadTimeout("test-only timeout")
         return httpx.Response(failure)
 
-    app.state.github = GitHub("mock-token", httpx.MockTransport(responder))
+    app.state.github = GitHub(
+        "mock-token", "demo/meetflow", httpx.MockTransport(responder)
+    )
     endpoint = f"/api/action-items/{task['id']}/github"
     result = client.post(endpoint).json()
     assert result["github_state"] == "FAILED" and word in result["github_error"]

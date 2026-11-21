@@ -11,6 +11,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from backend.app.accounts import DevOutboxEmailProvider
 from backend.app.ai import (
     COMPARE,
     EXTRACT,
@@ -26,6 +27,7 @@ from backend.app.github import GitHub
 from backend.app.main import create_app
 from backend.app.security import CSRF
 from backend.app.transcripts import deadline_for
+from scripts.local_signup import register_from_outbox
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_MODEL = "gpt-6-luna"
@@ -82,21 +84,17 @@ def approval_guard(expected):
             github_token=SecretStr(""),
         )
         app = create_app(settings)
+        outbox = Path(path) / "outbox"
+        app.state.email = DevOutboxEmailProvider(outbox)
         config = Config("alembic.ini")
         with app.state.engine.connect() as db:
             config.attributes["connection"] = db
             command.upgrade(config, "head")
         with TestClient(app) as client:
             header = {"x-meetflow-client": "1"}
-            client.post(
-                "/api/auth/register",
-                headers=header,
-                json={
-                    "email": "eval@example.org",
-                    "password": "synthetic-eval-password",
-                    "display_name": "Eval",
-                },
-            ).raise_for_status()
+            register_from_outbox(
+                client, "eval@example.org", "synthetic-eval-password", "Eval", outbox
+            )
             header["x-csrf-token"] = client.cookies[CSRF]
             calls: list[httpx.Request] = []
 
@@ -105,16 +103,8 @@ def approval_guard(expected):
                 return httpx.Response(500)
 
             app.state.github = GitHub(
-                "test-only-token", httpx.MockTransport(unexpected_post)
+                "test-only-token", "eval/fixture", httpx.MockTransport(unexpected_post)
             )
-            client.patch(
-                "/api/settings",
-                headers=header,
-                json={
-                    "github_repo": "eval/fixture",
-                    "timezone": "Asia/Kolkata",
-                },
-            ).raise_for_status()
             fixture = Path("samples/meeting1_2026-11-18.txt")
             meeting_id = (
                 client.post(

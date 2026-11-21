@@ -55,7 +55,7 @@ export function WeeklyDigests() {
     <Load query={query}>{entries => entries.length ? <div className="stack">{entries.map(item => <article className="panel record" key={item.id}>
       <div className="record-top"><div><h3>{item.person_name}</h3><small>Week of {dateLabel(item.week_start)}</small></div><ModeLabel mode={item.processing_mode} /></div>
       <div className="digest-columns">
-        <div><h4>Assigned tasks</h4>{item.payload.tasks.length ? <ul>{item.payload.tasks.map(task => <li key={task.id}>{task.title} · {dateLabel(task.deadline)} <Badge status={task.status} /></li>)}</ul> : <p>No assigned tasks.</p>}</div>
+        <div><h4>Assigned tasks</h4>{item.payload.tasks.length ? <ul>{item.payload.tasks.map(task => <li key={task.id}>{task.title} · {task.deadline ? dateLabel(task.deadline) : 'No deadline specified'} <Badge status={task.status} /></li>)}</ul> : <p>No assigned tasks.</p>}</div>
         <div><h4>Approved decisions</h4>{item.payload.decisions.length ? <ul>{item.payload.decisions.map((decision, index) => <li key={index}>{decision}</li>)}</ul> : <p>No relevant decisions.</p>}</div>
         <div><h4>Pending comparisons</h4>{item.payload.conflicts.length ? <ul>{item.payload.conflicts.map((topic, index) => <li key={index}>{topic}</li>)}</ul> : <p>No pending comparisons.</p>}</div>
       </div>
@@ -68,9 +68,9 @@ export function AccountSettings({ account, onExit }: { account: Account; onExit:
   return <><PageHead title="Account & settings" subtitle={account.email} />
     <section className="panel inset"><h2>Workspace</h2>
       <Load query={settings}>{prefs => <Controls>{(run, pending) => <form className="form-narrow" onSubmit={onSubmit(data => void run('/settings',
-        { github_repo: data.get('repo') || null, timezone: data.get('timezone') }, 'PATCH'))}>
-        <label>GitHub repository<input name="repo" defaultValue={prefs.github_repo ?? ''} placeholder="owner/repository" /></label>
-        <p className="muted">{prefs.github_ready ? 'GitHub token configured on the server.' : 'GitHub requires a server token.'}</p>
+        { timezone: data.get('timezone') }, 'PATCH'))}>
+        <p>{prefs.github_repo ? `GitHub repository: ${prefs.github_repo}` : 'No GitHub repository is configured on the server.'}</p>
+        {!prefs.github_ready && <p className="muted">An operator must configure the server repository and token to post issues.</p>}
         <label>Timezone<input name="timezone" defaultValue={prefs.timezone} required /></label><button className="primary" disabled={pending}>Save settings</button>
       </form>}</Controls>}</Load>
     </section>

@@ -35,13 +35,19 @@ def inspect(path):
                         "Restored database contains cross-owner references."
                     )
         version = db.execute("SELECT version_num FROM alembic_version").fetchone()
-        if not version or version[0] not in {"0001", "0002"}:
+        if not version or version[0] not in {"0001", "0002", "0003"}:
             raise RuntimeError(
                 "Unsupported MeetFlow schema revision for restore verification."
             )
         tables = set(metadata.tables)
         if version[0] == "0001":
             tables.remove("ai_monthly_totals")
+        if version[0] in {"0001", "0002"}:
+            tables.remove("registration_tokens")
+        elif "no_deadline_confirmed" not in {
+            row[1] for row in db.execute("PRAGMA table_info(action_items)")
+        }:
+            raise RuntimeError("Restored action items lack deadline confirmation.")
         return {
             name: db.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0]
             for name in sorted(tables)

@@ -21,15 +21,32 @@ class Browser(TestClient):
         return super().request(method, url, headers=headers, **kwargs)
 
 
+class Mailbox:
+    def __init__(self):
+        self.messages: list[tuple[str, str, str]] = []
+
+    def send(self, recipient: str, link: str, subject: str):
+        self.messages.append((recipient, link, subject))
+
+    def token(self):
+        return self.messages[-1][1].split("#token=", 1)[1]
+
+
 def register(client, email="alex@example.org", password="test-only-password"):
-    return client.post(
-        "/api/auth/register",
-        json={
-            "email": email,
-            "password": password,
-            "display_name": "Alex",
-        },
-    )
+    original = client.app.state.email
+    client.app.state.email = mailbox = Mailbox()
+    try:
+        client.post("/api/auth/register", json={"email": email}).raise_for_status()
+        return client.post(
+            "/api/auth/register/confirm",
+            json={
+                "token": mailbox.token(),
+                "password": password,
+                "display_name": "Alex",
+            },
+        )
+    finally:
+        client.app.state.email = original
 
 
 @pytest.fixture

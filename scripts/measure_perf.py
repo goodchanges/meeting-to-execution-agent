@@ -7,6 +7,9 @@ from uuid import uuid4
 
 import httpx
 
+from backend.app.config import Settings
+from scripts.local_signup import register_from_outbox
+
 
 def measure(url: str, count: int):
     identity = f"benchmark-{uuid4().hex[:8]}@example.org"
@@ -14,14 +17,9 @@ def measure(url: str, count: int):
     with httpx.Client(
         base_url=url, timeout=8, headers={"x-meetflow-client": "1"}
     ) as client:
-        client.post(
-            "/api/auth/register",
-            json={
-                "email": identity,
-                "display_name": "Local benchmark",
-                "password": password,
-            },
-        ).raise_for_status()
+        register_from_outbox(
+            client, identity, password, "Local benchmark", Settings().dev_outbox
+        )
         client.headers["x-csrf-token"] = client.cookies["meetflow_csrf"]
         output = {}
         try:
