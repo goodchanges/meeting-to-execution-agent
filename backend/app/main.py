@@ -8,7 +8,7 @@ from uuid import uuid4
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -16,10 +16,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
-from . import auth, meetings
+from . import auth, jobs, meetings, workflow
 from .ai import DemoProvider, LiveProvider
 from .config import Settings
 from .db import engine_for, utcnow
+from .github import GitHub
 from .security import Limiter, limit
 
 log = logging.getLogger("meetflow")
@@ -31,8 +32,13 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        yield
-        engine.dispose()
+        scheduler = jobs.start_jobs(app) if settings.scheduler_enabled else None
+        try:
+            yield
+        finally:
+            if scheduler:
+                scheduler.shutdown()
+            engine.dispose()
 
     app = FastAPI(
         title="MeetFlow",
@@ -49,6 +55,7 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
         DemoProvider() if settings.ai_mode == "demo" else LiveProvider(settings)
     )
     app.state.limiter = Limiter()
+    app.state.github = GitHub(settings.github_token.get_secret_value())
     config = Config("alembic.ini")
     head = ScriptDirectory.from_config(config).get_current_head()
 
@@ -78,6 +85,7 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
             inbound if re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", inbound) else uuid4().hex
         )
         started = monotonic()
+        response: Response
         try:
             scheme = request.url.scheme
             if request.client and request.client.host in settings.trusted_proxies:
@@ -154,6 +162,8 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
         ],
     )
     app.include_router(meetings.protected)
+    app.include_router(workflow.router)
+    app.include_router(jobs.router)
     app.include_router(auth.bootstrap)
     app.include_router(auth.protected)
 

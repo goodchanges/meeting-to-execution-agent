@@ -390,19 +390,20 @@ def process_records(request, meeting, segments, memory):
                     }
                 )
         decisions.append((item, relations))
-    for obj in breakdown.action_items:
+    for task in breakdown.action_items:
         title, description, excerpt = [
-            clean(value) for value in (obj.title, obj.description, obj.evidence_excerpt)
+            clean(value)
+            for value in (task.title, task.description, task.evidence_excerpt)
         ]
         proof = evidence(excerpt, segments)
-        owner = known.get(normalize(obj.owner or ""))
+        owner = known.get(normalize(task.owner or ""))
         if not proof or (
             owner
             and normalize(owner) != normalize(proof["speaker_label"] or "")
             and not re.search(rf"(?<!\w){re.escape(owner)}(?!\w)", excerpt, re.I)
         ):
             owner = None
-        raw = clean(obj.deadline_raw) if obj.deadline_raw else None
+        raw = clean(task.deadline_raw) if task.deadline_raw else None
         deadline = (
             deadline_for(raw, date_value)
             if raw and proof and grounded(raw, excerpt)

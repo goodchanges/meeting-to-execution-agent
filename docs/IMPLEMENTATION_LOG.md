@@ -9,3 +9,7 @@ Plan: establish migrated SQLite and authenticated routes, implement ingestion an
 ## 2026-11-21 — Backend core
 
 Added migrated SQLite, session auth, transcript ingestion and schema-validated AI with durable evidence and scoped memory. Fresh migration, readiness, anonymous account rejection and registration smoke returned 200/401/201. Next: approval, execution and fixtures.
+
+## 2026-11-21 — Execution workflow
+
+Added review and conflict state transitions, issue reconciliation, reminders and weekly digests. The automated two-meeting scenario passed with fixture-backed AI and GitHub HTTP mocked. Next: frontend and security completion.

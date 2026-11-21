@@ -42,4 +42,7 @@ def rows(db: Connection, stmt):
 
 
 def insert(db: Connection, table: Table, **values) -> str:
-    return str(db.execute(table.insert().values(**values)).inserted_primary_key[0])
+    primary_key = db.execute(table.insert().values(**values)).inserted_primary_key
+    if primary_key is None:
+        raise RuntimeError("Insert did not return a primary key.")
+    return str(primary_key[0])
