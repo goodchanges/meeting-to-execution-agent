@@ -1,0 +1,4 @@
+[00:00:05] Alex: Decision: The product launch is Dec 15, 2026.
+[00:00:12] Rahul: Decision: The first release must include user authentication.
+[00:00:20] Sarah: Action: Finalize UI designs by Nov 27.
+[00:00:31] Rahul: Action: Finish the backend API by Dec 2.
