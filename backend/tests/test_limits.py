@@ -60,20 +60,25 @@ def test_metrics_bearer_and_ai_latency_partition(setup):
     assert route["requests"] == 1 and route["p95_ms"] is None
 
 
-def test_openai_adapter_repairs_bad_json_and_passes_no_tools(setup, monkeypatch):
+def test_deepseek_adapter_repairs_bad_json_and_passes_no_tools(setup, monkeypatch):
     app, client, _ = setup
     settings = app.state.settings
-    settings.llm_api_key = SecretStr("test-placeholder-provider-key")
+    settings.deepseek_api_key = SecretStr("test-placeholder-provider-key")
     settings.ai_mode = "live"
+    settings.llm_model = "deepseek-flash"
+    settings.deepseek_output_format = "json_schema"
     app.state.provider = LiveProvider(settings)
     calls = []
 
     def mock_post(url, **request):
         calls.append(request)
-        assert url == "https://api.openai.com/v1/responses"
+        assert url == "https://api.deepseek.com/responses"
         body = request["json"]
-        assert body["text"]["format"]["strict"] is True
-        assert body["store"] is False and "tools" not in body
+        assert body["model"] == "deepseek-flash"
+        assert body["reasoning"] == {"effort": "none"}
+        assert body["text"]["format"]["type"] == "json_schema"
+        assert body["text"]["format"]["schema"]["additionalProperties"] is False
+        assert "tools" not in body
         assert "test-placeholder-provider-key" not in str(body)
         output = (
             "not-json"

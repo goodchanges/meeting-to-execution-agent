@@ -18,12 +18,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
 from . import accounts, auth, jobs, meetings, workflow
-from .ai import DemoProvider, LiveProvider
 from .config import Settings
 from .db import engine_for, utcnow
 from .github import GitHub
 from .models import ai_usage
 from .observability import Metrics
+from .providers import runtime_provider
 from .security import Limiter, limit
 
 log = logging.getLogger("meetflow")
@@ -57,9 +57,7 @@ def create_app(settings: Settings | None = None, *, clock=utcnow, provider=None)
     app.state.engine = engine
     app.state.logger = log
     app.state.clock = clock
-    app.state.provider = provider or (
-        DemoProvider() if settings.ai_mode == "demo" else LiveProvider(settings)
-    )
+    app.state.provider = provider or runtime_provider(settings)
     app.state.limiter = Limiter()
     app.state.metrics = Metrics()
     app.state.email = accounts.email_for(settings)

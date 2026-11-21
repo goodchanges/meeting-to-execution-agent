@@ -17,7 +17,6 @@ from backend.app.ai import (
     EXTRACT,
     Comparison,
     Extraction,
-    LiveProvider,
     ProviderError,
     grounded,
     wrap,
@@ -25,13 +24,17 @@ from backend.app.ai import (
 from backend.app.config import Settings
 from backend.app.github import GitHub
 from backend.app.main import create_app
+from backend.app.providers import live_provider
 from backend.app.security import CSRF
 from backend.app.transcripts import deadline_for
 from scripts.local_signup import register_from_outbox
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_MODEL = "gpt-6-luna"
-INPUT_USD, OUTPUT_USD = 0.10, 0.50
+# Standard uncached estimates. Use Gemini's published post-promotion rates.
+USD_PER_MILLION = {
+    ("deepseek", "deepseek-flash"): (0.30, 1.20),
+    ("gemini", "gemini-3.8-flash"): (1.50, 7.50),
+}
 
 
 def compare_score(result, payload, expected):
@@ -153,10 +156,11 @@ def main():
     output_limit = min(settings.max_output_tokens, 1200)
     if args.provider == "live":
         count = sum(case["operation"] != "guard" for case in cases)
-        if settings.llm_model != DEFAULT_MODEL:
-            parser.error(
-                "Live evaluation currently prices only gpt-6-luna. Set LLM_MODEL accordingly."
-            )
+        provider = live_provider(settings)
+        rates = USD_PER_MILLION.get((provider.name, provider.model))
+        if rates is None:
+            parser.error("This live provider/model has no configured price estimate.")
+        input_usd, output_usd = rates
         if (
             count > args.max_calls
             or args.max_calls <= 0
@@ -166,20 +170,25 @@ def main():
                 "Set a positive budget up to USD 1 and a call cap covering the dataset."
             )
         # Estimate with a generous prompt budget including schema overhead, and one bounded request per case.
-        estimated = count * (8000 * INPUT_USD + output_limit * OUTPUT_USD) / 1_000_000
+        estimated = count * (8000 * input_usd + output_limit * output_usd) / 1_000_000
         print(
             f"Estimated upper budget for {count} paid calls: USD {estimated:.4f}",
             flush=True,
         )
+        key = (
+            settings.gemini_api_key
+            if settings.ai_provider == "gemini"
+            else settings.deepseek_api_key
+        )
         if (
             not args.confirm_live
-            or not settings.llm_api_key.get_secret_value()
+            or not key.get_secret_value()
             or estimated > args.budget_usd
         ):
             parser.error(
-                "Require --confirm-live, LLM_API_KEY and an adequate budget before sending requests."
+                "Require --confirm-live, the selected provider's API key and an adequate budget."
             )
-        live = LiveProvider(settings)
+        live = provider
 
     results = []
     for case in cases:

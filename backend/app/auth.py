@@ -78,11 +78,16 @@ def logout(request: Request, response: Response, user: User):
 @protected.get("/account")
 def account(user: User, request: Request):
     settings = request.app.state.settings
+    api_key = (
+        settings.gemini_api_key
+        if settings.ai_provider == "gemini"
+        else settings.deepseek_api_key
+    )
     return {
         "id": user["id"],
         "display_name": user["display_name"],
         "email": user["email"],
         "ai_mode": settings.ai_mode,
-        "ai_ready": settings.ai_mode == "demo"
-        or bool(settings.llm_api_key.get_secret_value()),
+        "ai_provider": settings.ai_provider,
+        "ai_ready": settings.ai_mode == "demo" or bool(api_key.get_secret_value()),
     }

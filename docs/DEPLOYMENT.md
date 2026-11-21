@@ -4,6 +4,8 @@ Build one instance from the repository root using `docker build -f deploy/Docker
 
 Mount a persistent volume at `/data`, writable by UID/GID 10001, on a filesystem supporting SQLite WAL and hard links. Run one worker. Set proxy timeouts that allow bounded extraction to complete. Startup snapshots the existing database before changing its schema and runs Alembic.
 
+For a local development container, read a synthetic signup link with `docker compose -f deploy/docker-compose.yml exec meetflow ls -t /data/dev-outbox`, then open the corresponding file with `docker compose -f deploy/docker-compose.yml exec meetflow cat /data/dev-outbox/FILENAME`.
+
 Terminate TLS at the host or reverse proxy. Attach the chosen domain, set the hosting provider's requested DNS records, and wait for certificate issuance. Set `PUBLIC_URL` to the exact HTTPS origin, configure the proxy source IP in `TRUSTED_PROXIES`, and ensure the proxy overwrites `X-Forwarded-Proto`. Keep app ports private. Staging and production enable secure cookies and HSTS. Add explicit CORS origins only for separate authorized clients.
 
 Check `/healthz`, `/readyz`, login, recent decisions, a signup verification email and a reset email and approval-to-GitHub flow before inviting users. Hosting, TLS, Docker startup and SMTP remain unverified.

@@ -24,8 +24,12 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=1_048_576, ge=64, le=10_485_760)
     max_segments: int = Field(default=2000, ge=1, le=10_000)
     ai_mode: Literal["live", "demo"] = "live"
-    llm_api_key: SecretStr = SecretStr("")
-    llm_model: str = "gpt-6-luna"
+    ai_provider: Literal["gemini", "deepseek"] = "gemini"
+    gemini_api_key: SecretStr = SecretStr("")
+    gemini_model: str = "gemini-3.8-flash"
+    deepseek_api_key: SecretStr = SecretStr("")
+    llm_model: str = "deepseek-flash"
+    deepseek_output_format: Literal["json_schema", "json_object"] = "json_schema"
     max_input_tokens: int = Field(default=16000, ge=100, le=100_000)
     max_output_tokens: int = Field(default=4096, ge=16, le=10_000)
     ai_timeout: float = Field(default=25, gt=0, le=45)

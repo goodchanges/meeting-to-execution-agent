@@ -15,6 +15,7 @@ ENV APP_VERSION=${APP_VERSION} \
     PATH=/app/.venv/bin:$PATH \
     DB_PATH=/data/meetflow.sqlite \
     BACKUP_DIR=/data/backups \
+    DEV_OUTBOX=/data/dev-outbox \
     PORT=8000
 WORKDIR /app
 COPY --from=uv /uv /usr/local/bin/uv

@@ -96,7 +96,7 @@ function Shell({ account }: { account: Account }) {
       <span>MeetFlow Workspace</span><span className="grow" /><ModeLabel mode={account.ai_mode} /><Link aria-label="Notifications" to="/notifications" className="icon-button top-bell"><Bell size={18} /></Link>
     </header>
     <main id="main" className="content">
-      {!account.ai_ready && <Problem message="Live AI is enabled. Set LLM_API_KEY on the server to process transcripts." />}
+      {!account.ai_ready && <Problem message={`Live AI is enabled. Set ${account.ai_provider === "gemini" ? "GEMINI_API_KEY" : "DEEPSEEK_API_KEY"} on the server to process transcripts.` } />}
       <Routes>
         <Route path="/" element={<Dashboard account={account} />} />
         <Route path="/meetings" element={<MeetingList />} /><Route path="/meetings/:id" element={<MeetingDetail />} />

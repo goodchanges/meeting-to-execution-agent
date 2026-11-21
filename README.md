@@ -4,10 +4,10 @@
 
 ## Run locally
 
-Use Python 3.11+, uv and Node 22 LTS (22.12+). From the repository root in PowerShell:
+Use Python 3.11+, uv and Node 22 LTS (22.13+). From the repository root in PowerShell:
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path -LiteralPath .env)) { Copy-Item .env.example .env }
 uv sync --locked
 npm.cmd --prefix frontend ci
 npm.cmd --prefix frontend run build
@@ -15,15 +15,18 @@ uv run alembic upgrade head
 uv run uvicorn backend.app.main:app --no-access-log --no-proxy-headers
 ```
 
-Open [MeetFlow](http://localhost:8000) and request a registration link. In development, open the link from the new file in the ignored `dev-outbox/` directory, then choose a display name and password. Existing users can sign in directly. FastAPI serves the built UI. For hot reload run `npm --prefix frontend run dev` in a second terminal and add `http://127.0.0.1:5173` to `CORS_ORIGINS` for origin validation. On macOS/Linux use `cp` and `npm` in place of the PowerShell equivalents.
+On macOS or Linux, use `test -f .env || cp .env.example .env` for the first line and use `npm` in place of `npm.cmd`.
+
+Open [MeetFlow](http://localhost:8000) and request a registration link. In development, open the link from the new file in the ignored `dev-outbox/` directory, then choose a display name and password. Existing users can sign in directly. FastAPI serves the built UI. For hot reload run `npm.cmd --prefix frontend run dev` in a second terminal and add `http://127.0.0.1:5173` to `CORS_ORIGINS` for origin validation.
 
 ## Run the demo
 
-Set `AI_MODE=demo` in `.env` before startup. Upload the [two supplied transcripts](samples/) in order. Fixture output is labeled **DEMO MODE — not live AI**. See the [demo walkthrough](docs/DEMO_WALKTHROUGH.md) for the sequence, dates, and GitHub setup.
+Set `AI_MODE=demo` in `.env` before startup. Upload the [two supplied transcripts](samples/) in order. Fixture output is labeled **DEMO MODE — not live AI**. Local signup uses the development outbox and the demo requires no API keys. See the [demo walkthrough](docs/DEMO_WALKTHROUGH.md) for an isolated database, the reminder window, and the GitHub confirmation preview.
 
 | Settings | Purpose |
 |---|---|
-| `AI_MODE`, `LLM_API_KEY`, `LLM_MODEL` | OpenAI extraction uses a server key. Demo uses local fixtures. |
+| `AI_MODE`, `AI_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL` | The demo uses local fixtures. The optional Gemini adapter targets the native Interactions API with `gemini-3.8-flash` by default. |
+| `DEEPSEEK_API_KEY`, `LLM_MODEL`, `DEEPSEEK_OUTPUT_FORMAT` | Select `AI_PROVIDER=deepseek` to use DeepSeek explicitly. Its `/responses` adapter defaults to `deepseek-flash` and `json_schema`, with `json_object` available. |
 | `MAX_INPUT_TOKENS`, `MAX_OUTPUT_TOKENS`, `AI_TIMEOUT` | Input approximation, output limit and outbound timeout. |
 | `AI_USER_MONTHLY_CALL_CAP`, `AI_GLOBAL_MONTHLY_CALL_CAP` | App-level paid attempt limits. The global aggregate survives account deletion. Configure provider budgets separately. |
 | `GITHUB_REPOSITORY`, `GITHUB_TOKEN` | Server-only `owner/repository` and a fine-grained PAT scoped to that same repository with Issues read/write. Settings displays the destination read-only. |
@@ -33,7 +36,7 @@ Set `AI_MODE=demo` in `.env` before startup. Upload the [two supplied transcript
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_SENDER` | SMTP signup and reset delivery via STARTTLS outside development. |
 | `METRICS_TOKEN`, `BACKUP_DIR`, `BACKUP_RETAIN` | Optional metrics lock and snapshot retention. |
 
-Runtime OpenAI billing is separate from Codex billing. Check pricing before enabling live AI. [GPT-6 Luna model reference](https://developers.openai.com/api/docs/models/gpt-6-luna)
+Gemini model metadata and authentication have been verified. Live generation remains unverified. The adapter's stateless Interactions requests, JSON Schema output and Pydantic validation are covered by offline tests with mocked responses. [Google Interactions API](https://ai.google.dev/gemini-api/docs/interactions), [structured output](https://ai.google.dev/gemini-api/docs/structured-output)
 
 Tasks with an owner can be approved without a date after the reviewer edits the task and checks **Confirm no deadline was specified**. Ambiguous source deadlines require a date. Approved undated tasks appear in weekly digests and are skipped by deadline reminders.
 
@@ -54,6 +57,4 @@ uv run python -m evals.run_evals --provider fake
 
 See the [Makefile](Makefile), [architecture](docs/ARCHITECTURE.md), [deployment](docs/DEPLOYMENT.md), [operations](docs/OPERATIONS.md), [rollback](docs/ROLLBACK.md), [security](docs/SECURITY.md), [dependency audit](docs/DEPENDENCY_AUDIT.md), and [implementation log](docs/IMPLEMENTATION_LOG.md).
 
-The targeted security and deadline update passed 55 backend tests, including the separately rerun two-meeting scenario. Ruff, mypy, frontend lint and production build, and 2 Vitest tests passed. The offline evaluation passed 24/24. A local Edge smoke verified email signup and the read-only destination. The dependency audits found no known findings, and Gitleaks found no leaks.
-
-Live evals not run. Automated checks use fixtures and mocked GitHub HTTP. Live GitHub, SMTP, hosted deployment, hosted GitHub Actions, and Docker rollback require separate verification. Draft [privacy](docs/PRIVACY_POLICY.md) and [terms](docs/TERMS_OF_SERVICE.md) require legal review before commercial use.
+Automated checks use fixtures and mocked GitHub HTTP. Container startup, hosted deployment, hosted GitHub Actions, live GitHub and SMTP remain unverified. Draft [privacy](docs/PRIVACY_POLICY.md) and [terms](docs/TERMS_OF_SERVICE.md) require legal review before commercial use.

@@ -32,7 +32,7 @@ export function useAction() {
 }
 
 export type Mode = 'live' | 'demo'
-export type Account = { display_name: string; email: string; ai_mode: Mode; ai_ready: boolean }
+export type Account = { display_name: string; email: string; ai_mode: Mode; ai_provider: "gemini" | "deepseek"; ai_ready: boolean }
 export type MeetingRef = { id: string; title: string; meeting_date: string }
 export type Meeting = MeetingRef & {
   processing_mode: Mode; status: string; failure_reason: string | null; source_format: string

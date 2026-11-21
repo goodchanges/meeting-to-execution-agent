@@ -119,12 +119,16 @@ def wrap(data: dict) -> str:
     return f"<{boundary}>\n{payload}\n</{boundary}>"
 
 
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+
 class LiveProvider:
-    name = "openai"
+    name = "deepseek"
 
     def __init__(self, settings: Settings):
         self.model = settings.llm_model
-        self.key = settings.llm_api_key
+        self.key = settings.deepseek_api_key
+        self.output_format = settings.deepseek_output_format
 
     def generate_structured(
         self,
@@ -136,31 +140,29 @@ class LiveProvider:
     ) -> tuple[T, Usage]:
         if not self.key.get_secret_value():
             raise ProviderError(
-                "Live AI is enabled. Configure LLM_API_KEY to process meetings."
+                "Live AI is enabled. Configure DEEPSEEK_API_KEY to process meetings."
+            )
+        output_format: dict = {"type": self.output_format}
+        json_schema = schema.model_json_schema()
+        if self.output_format == "json_schema":
+            output_format.update(name=schema.__name__, schema=json_schema)
+        else:
+            system += (
+                "\nReturn a single JSON object that conforms to this JSON Schema, "
+                "including all required fields and no extra fields:\n"
+                + json.dumps(json_schema, separators=(",", ":"))
             )
         try:
             response = httpx.post(
-                "https://api.openai.com/v1/responses",
+                f"{DEEPSEEK_BASE_URL}/responses",
                 headers={"Authorization": f"Bearer {self.key.get_secret_value()}"},
                 json={
                     "model": self.model,
                     "instructions": system,
                     "input": user_content,
                     "max_output_tokens": max_output_tokens,
-                    "store": False,
-                    **(
-                        {"reasoning": {"effort": "none"}}
-                        if self.model == "gpt-6-luna"
-                        else {}
-                    ),
-                    "text": {
-                        "format": {
-                            "type": "json_schema",
-                            "name": schema.__name__,
-                            "strict": True,
-                            "schema": schema.model_json_schema(),
-                        }
-                    },
+                    "reasoning": {"effort": "none"},
+                    "text": {"format": output_format},
                 },
                 timeout=timeout,
             )
@@ -177,17 +179,23 @@ class LiveProvider:
             )
         try:
             data = response.json()
-            result = [
-                part["text"]
-                for item in data["output"]
-                if item["type"] == "message"
-                for part in item["content"]
-                if part["type"] == "output_text"
-            ]
-            if data.get("status") != "completed" or len(result) != 1:
+            if (
+                data.get("status") != "completed"
+                or data.get("error")
+                or data.get("incomplete_details")
+            ):
+                raise ValueError()
+            messages = [item for item in data["output"] if item["type"] == "message"]
+            if (
+                len(messages) != 1
+                or messages[0].get("status", "completed") != "completed"
+            ):
+                raise ValueError()
+            content = messages[0]["content"]
+            if len(content) != 1 or content[0]["type"] != "output_text":
                 raise ValueError()
             usage = data.get("usage") or {}
-            return schema.model_validate_json(result[0]), Usage(
+            return schema.model_validate_json(content[0]["text"]), Usage(
                 usage.get("input_tokens"),
                 usage.get("output_tokens"),
             )
